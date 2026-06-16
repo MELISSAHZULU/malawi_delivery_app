@@ -259,7 +259,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Center(
           child: Column(
             children: [
-              Icon(Icons.error_outline, size: 48, color: Colors.red.shade400),
+              const Icon(Icons.error_outline, size: 48, color: Colors.red),
               const SizedBox(height: 16),
               Text(
                 'Error loading products',
@@ -267,7 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               Text(
                 productProvider.error!,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                style: const TextStyle(fontSize: 12),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -282,12 +282,27 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (productProvider.products.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(32.0),
+      return Padding(
+        padding: const EdgeInsets.all(32.0),
         child: Center(
-          child: Text(
-            'No products available',
-            style: TextStyle(color: Colors.grey),
+          child: Column(
+            children: [
+              Icon(Icons.inventory_2, size: 48, color: Colors.grey.shade400),
+              const SizedBox(height: 16),
+              Text(
+                'No products available',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Check back later for new items',
+                style: TextStyle(color: Colors.grey.shade500),
+              ),
+            ],
           ),
         ),
       );
