@@ -32,20 +32,35 @@ class Product {
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
+    // Handle price that might be a string or double
+    double parsePrice(dynamic price) {
+      if (price == null) return 0.0;
+      if (price is double) return price;
+      if (price is int) return price.toDouble();
+      if (price is String) {
+        // Remove any currency symbols and parse
+        final cleaned = price.replaceAll(RegExp(r'[^0-9.]'), '');
+        return double.tryParse(cleaned) ?? 0.0;
+      }
+      return 0.0;
+    }
+
     return Product(
       id: json['id'] ?? 0,
       name: json['name'] ?? '',
       description: json['description'] ?? '',
-      price: (json['price'] ?? 0).toDouble(),
-      imageUrl: json['image_url'],
+      price: parsePrice(json['price']),
+      imageUrl: json['images'] != null && json['images'].isNotEmpty 
+          ? json['images'][0] 
+          : null,
       rating: (json['rating'] ?? 0).toDouble(),
-      deliveryTime: json['delivery_time'] ?? '20-30 min',
+      deliveryTime: '${json['preparation_time'] ?? 15}-${(json['preparation_time'] ?? 15) + 10} min',
       isPremium: json['is_premium'] ?? false,
       isAvailable: json['is_available'] ?? true,
       sellerId: json['seller'] ?? 0,
       sellerName: json['seller_name'] ?? '',
       stockQuantity: json['stock_quantity'] ?? 0,
-      categoryId: json['category_id'],
+      categoryId: json['category'],
       categoryName: json['category_name'],
     );
   }

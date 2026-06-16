@@ -13,31 +13,65 @@ class ProductProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  Future<void> fetchProducts({int? categoryId, String? searchQuery}) async {
+  Future<void> fetchProducts() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _apiService.getProducts(
-        categoryId: categoryId,
-        search: searchQuery,
-      );
+      // Use the seller products endpoint
+      final response = await _apiService.getSellerProducts();
+      print('Fetch products response: $response');
       
       if (response['success'] == true) {
-        _products = (response['data'] as List)
-            .map((item) => Product.fromJson(item))
-            .toList();
+        final data = response['data'];
+        if (data is List) {
+          _products = data.map((item) => Product.fromJson(item)).toList();
+        } else {
+          _products = [];
+        }
         _filteredProducts = [];
+        print('Products loaded: ${_products.length}');
       } else {
         _error = response['error'] ?? 'Failed to load products';
+        print('Error loading products: $_error');
       }
     } catch (e) {
       _error = 'Network error: $e';
+      print('Network error: $e');
     }
 
     _isLoading = false;
     notifyListeners();
+  }
+
+  Future<bool> createProduct(Map<String, dynamic> productData) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.createProduct(productData);
+      print('Create product response: $response');
+      
+      if (response['success'] == true) {
+        final newProduct = Product.fromJson(response['data']);
+        _products.insert(0, newProduct);
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _error = response['error'] ?? 'Failed to create product';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _error = 'Network error: $e';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 
   void filterByCategory(String categoryName) {
@@ -70,5 +104,10 @@ class ProductProvider extends ChangeNotifier {
     } catch (e) {
       return null;
     }
+  }
+
+  void clearError() {
+    _error = null;
+    notifyListeners();
   }
 }

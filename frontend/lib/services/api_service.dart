@@ -7,6 +7,7 @@ class ApiService {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   static const String baseUrl = AppConstants.apiBaseUrl;
 
+  // ============ AUTH ============
   Future<Map<String, dynamic>> login(String username, String password) async {
     try {
       final response = await http.post(
@@ -108,19 +109,13 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> getProducts({int? categoryId, String? search}) async {
+  // ============ PRODUCTS ============
+  Future<Map<String, dynamic>> getProducts() async {
     try {
       final token = await _storage.read(key: 'access_token');
       
-      // Build query parameters
-      final queryParams = <String, String>{};
-      if (categoryId != null) queryParams['category'] = categoryId.toString();
-      if (search != null && search.isNotEmpty) queryParams['search'] = search;
-      
-      final uri = Uri.parse('$baseUrl/marketplace/products/').replace(queryParameters: queryParams);
-      
       final response = await http.get(
-        uri,
+        Uri.parse('$baseUrl/marketplace/products/'),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -138,6 +133,133 @@ class ApiService {
       return {'success': false, 'error': 'Failed to fetch products'};
     } catch (e) {
       print('Get products error: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> getSellerProducts() async {
+    try {
+      final token = await _storage.read(key: 'access_token');
+      
+      if (token == null) {
+        return {'success': false, 'error': 'Not authenticated'};
+      }
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/marketplace/seller/products/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('Get seller products status: ${response.statusCode}');
+      print('Get seller products body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return {'success': true, 'data': data};
+      }
+      return {'success': false, 'error': 'Failed to fetch seller products'};
+    } catch (e) {
+      print('Get seller products error: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> createProduct(Map<String, dynamic> productData) async {
+    try {
+      final token = await _storage.read(key: 'access_token');
+      
+      if (token == null) {
+        return {'success': false, 'error': 'Not authenticated'};
+      }
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/marketplace/seller/products/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode(productData),
+      );
+
+      print('Create product status: ${response.statusCode}');
+      print('Create product body: ${response.body}');
+
+      if (response.statusCode == 201) {
+        return {'success': true, 'data': json.decode(response.body)};
+      } else {
+        final data = json.decode(response.body);
+        return {'success': false, 'error': data['error'] ?? 'Failed to create product'};
+      }
+    } catch (e) {
+      print('Create product error: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  // ============ ORDERS ============
+  Future<Map<String, dynamic>> getOrders() async {
+    try {
+      final token = await _storage.read(key: 'access_token');
+      
+      if (token == null) {
+        return {'success': false, 'error': 'Not authenticated'};
+      }
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/orders/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('Get orders status: ${response.statusCode}');
+      print('Get orders body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return {'success': true, 'data': data};
+      }
+      return {'success': false, 'error': 'Failed to fetch orders'};
+    } catch (e) {
+      print('Get orders error: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> getOrder(String orderId) async {
+    try {
+      final token = await _storage.read(key: 'access_token');
+      
+      if (token == null) {
+        return {'success': false, 'error': 'Not authenticated'};
+      }
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/orders/$orderId/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('Get order status: ${response.statusCode}');
+      print('Get order body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': json.decode(response.body)};
+      } else {
+        return {'success': false, 'error': 'Order not found'};
+      }
+    } catch (e) {
+      print('Get order error: $e');
       return {'success': false, 'error': e.toString()};
     }
   }
@@ -175,66 +297,7 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> getOrders() async {
-    try {
-      final token = await _storage.read(key: 'access_token');
-      
-      if (token == null) {
-        return {'success': false, 'error': 'Not authenticated'};
-      }
-      
-      final response = await http.get(
-        Uri.parse('$baseUrl/orders/'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      print('Get orders status: ${response.statusCode}');
-      print('Get orders body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'data': json.decode(response.body)};
-      }
-      return {'success': false, 'error': 'Failed to fetch orders'};
-    } catch (e) {
-      print('Get orders error: $e');
-      return {'success': false, 'error': e.toString()};
-    }
-  }
-
-  Future<Map<String, dynamic>> getOrder(String orderId) async {
-    try {
-      final token = await _storage.read(key: 'access_token');
-      
-      if (token == null) {
-        return {'success': false, 'error': 'Not authenticated'};
-      }
-      
-      final response = await http.get(
-        Uri.parse('$baseUrl/orders/$orderId/'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      print('Get order status: ${response.statusCode}');
-      print('Get order body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'data': json.decode(response.body)};
-      }
-      return {'success': false, 'error': 'Order not found'};
-    } catch (e) {
-      print('Get order error: $e');
-      return {'success': false, 'error': e.toString()};
-    }
-  }
-
+  // ============ USER ============
   Future<Map<String, dynamic>> getCurrentUser() async {
     try {
       final token = await _storage.read(key: 'access_token');
@@ -259,7 +322,6 @@ class ApiService {
         final data = json.decode(response.body);
         return {'success': true, 'data': data};
       } else if (response.statusCode == 401) {
-        // Token expired
         return {'success': false, 'error': 'Session expired'};
       } else {
         return {'success': false, 'error': 'Failed to get user'};

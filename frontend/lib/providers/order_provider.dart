@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../models/order.dart';
-import '../models/cart_item.dart';
 import '../services/api_service.dart';
 
 class OrderProvider extends ChangeNotifier {
@@ -22,15 +21,30 @@ class OrderProvider extends ChangeNotifier {
 
     try {
       final response = await _apiService.getOrders();
+      print('Fetch orders response: $response');
+      
       if (response['success'] == true) {
-        _orders = (response['data'] as List)
-            .map((item) => Order.fromJson(item))
-            .toList();
+        final data = response['data'];
+        if (data is List) {
+          _orders = data.map((item) {
+            try {
+              return Order.fromJson(item);
+            } catch (e) {
+              print('Error parsing order: $e');
+              return null;
+            }
+          }).whereType<Order>().toList();
+          print('Orders loaded: ${_orders.length}');
+        } else {
+          _orders = [];
+        }
       } else {
         _error = response['error'] ?? 'Failed to fetch orders';
+        print('Error loading orders: $_error');
       }
     } catch (e) {
       _error = 'Network error: $e';
+      print('Network error: $e');
     }
 
     _isLoading = false;
@@ -44,13 +58,22 @@ class OrderProvider extends ChangeNotifier {
 
     try {
       final response = await _apiService.createOrder(orderData);
+      print('Create order response: $response');
+      
       if (response['success'] == true) {
-        _currentOrder = Order.fromJson(response['data']);
-        // Add to orders list
-        _orders.insert(0, _currentOrder!);
-        _isLoading = false;
-        notifyListeners();
-        return true;
+        try {
+          final newOrder = Order.fromJson(response['data']);
+          _orders.insert(0, newOrder);
+          _currentOrder = newOrder;
+          _isLoading = false;
+          notifyListeners();
+          return true;
+        } catch (e) {
+          _error = 'Error parsing order data: $e';
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
       } else {
         _error = response['error'] ?? 'Failed to create order';
         _isLoading = false;
@@ -71,14 +94,35 @@ class OrderProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _apiService.getOrder(orderId);
-      if (response['success'] == true) {
-        _currentOrder = Order.fromJson(response['data']);
-      } else {
-        _error = response['error'] ?? 'Order not found';
-      }
+      // First, try to find the order in the existing list
+      final existingOrder = _orders.firstWhere(
+        (o) => o.id == orderId || o.orderNumber == orderId,
+        orElse: () => throw Exception('Order not found'),
+      );
+      _currentOrder = existingOrder;
+      print('Found order in list: ${_currentOrder?.orderNumber}');
     } catch (e) {
-      _error = 'Network error: $e';
+      // If not found in list, fetch from API
+      try {
+        final response = await _apiService.getOrder(orderId);
+        print('Track order response: $response');
+        
+        if (response['success'] == true) {
+          try {
+            _currentOrder = Order.fromJson(response['data']);
+            print('Order loaded: ${_currentOrder?.orderNumber}');
+          } catch (parseError) {
+            _error = 'Error parsing order: $parseError';
+            print('Parse error: $parseError');
+          }
+        } else {
+          _error = response['error'] ?? 'Order not found';
+          print('Error tracking order: $_error');
+        }
+      } catch (apiError) {
+        _error = 'Network error: $apiError';
+        print('Network error: $apiError');
+      }
     }
 
     _isLoading = false;

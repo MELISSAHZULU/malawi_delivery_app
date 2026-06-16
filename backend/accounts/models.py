@@ -27,7 +27,6 @@ class User(AbstractUser):
 class BuyerProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='buyer_profile')
     delivery_addresses = models.JSONField(default=list)
-    favorite_sellers = models.ManyToManyField('accounts.SellerProfile', blank=True)
     order_count = models.IntegerField(default=0)
 
 class SellerProfile(models.Model):
@@ -37,10 +36,10 @@ class SellerProfile(models.Model):
     store_logo = models.ImageField(upload_to='stores/', null=True, blank=True)
     store_banner = models.ImageField(upload_to='stores/banners/', null=True, blank=True)
     address = models.CharField(max_length=255)
-    latitude = models.DecimalField(max_digits=9, decimal_places=6)
-    longitude = models.DecimalField(max_digits=9, decimal_places=6)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, default=0)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, default=0)
     is_active = models.BooleanField(default=True)
-    opening_hours = models.JSONField(default=dict)
+    opening_hours = models.JSONField(default=dict)  # Store as dict: {"monday": "08:00-20:00", ...}
     rating = models.FloatField(default=0)
     total_orders = models.IntegerField(default=0)
     delivery_fee = models.DecimalField(max_digits=10, decimal_places=2, default=1500)
