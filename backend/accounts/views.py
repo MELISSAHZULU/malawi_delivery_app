@@ -4,8 +4,11 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
+from django.contrib.auth import get_user_model
 from .serializers import RegisterSerializer, UserSerializer, ProfileSerializer
-from .models import User
+from .models import User, SellerProfile
+
+User = get_user_model()
 
 class RegisterView(generics.CreateAPIView):
     permission_classes = [AllowAny]
@@ -28,11 +31,14 @@ class RegisterView(generics.CreateAPIView):
         error_messages = []
         for field, errors in serializer.errors.items():
             for error in errors:
-                error_messages.append(f"{field}: {error}")
+                if isinstance(error, dict):
+                    error_messages.append(f"{field}: {', '.join(error.values())}")
+                else:
+                    error_messages.append(f"{field}: {error}")
         
         return Response({
             'success': False,
-            'error': ', '.join(error_messages) if error_messages else 'Registration failed'
+            'error': ' | '.join(error_messages) if error_messages else 'Registration failed'
         }, status=status.HTTP_400_BAD_REQUEST)
 
 class LoginView(TokenObtainPairView):
@@ -42,15 +48,30 @@ class LoginView(TokenObtainPairView):
         username = request.data.get('username')
         password = request.data.get('password')
         
+        print(f"Login attempt for user: {username}")
+        
         if not username or not password:
             return Response({
                 'success': False,
                 'error': 'Username and password are required'
             }, status=status.HTTP_400_BAD_REQUEST)
         
+        # Check if user exists
+        try:
+            user = User.objects.get(username=username)
+            print(f"User found: {user.username}, Role: {user.role}, Active: {user.is_active}")
+        except User.DoesNotExist:
+            print(f"User '{username}' does not exist")
+            return Response({
+                'success': False,
+                'error': 'Invalid credentials'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Authenticate user
         user = authenticate(username=username, password=password)
         
         if user is None:
+            print(f"Authentication failed for {username}")
             return Response({
                 'success': False,
                 'error': 'Invalid credentials'
@@ -62,11 +83,21 @@ class LoginView(TokenObtainPairView):
                 'error': 'Account is disabled'
             }, status=status.HTTP_403_FORBIDDEN)
         
+        # Generate tokens
         refresh = RefreshToken.for_user(user)
+        
+        # Get user data with role-specific info
+        user_data = UserSerializer(user).data
+        
+        # Add store name for sellers
+        if user.role == 'seller' and hasattr(user, 'seller_profile'):
+            user_data['store_name'] = user.seller_profile.store_name
+        
+        print(f"Login successful for {username}, Role: {user.role}")
         
         return Response({
             'success': True,
-            'user': UserSerializer(user).data,
+            'user': user_data,
             'access': str(refresh.access_token),
             'refresh': str(refresh),
             'message': 'Login successful'
@@ -78,11 +109,3 @@ class ProfileView(generics.RetrieveUpdateAPIView):
     
     def get_object(self):
         return self.request.user
-
-# accounts/views.py
-class UpdateStoreView(generics.UpdateAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = SellerProfileSerializer
-    
-    def get_object(self):
-        return self.request.user.seller_profile

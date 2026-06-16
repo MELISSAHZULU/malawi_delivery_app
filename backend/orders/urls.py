@@ -1,13 +1,14 @@
 from django.urls import path
 from .views import (
-    CreateOrderView, OrderListView, OrderDetailView,
-    UpdateOrderStatusView, CancelOrderView
+    OrderListView,
+    OrderDetailView,
+    OrderTrackingView,
+    UpdateOrderStatusView,
 )
 
 urlpatterns = [
-    path('', OrderListView.as_view(), name='orders'),
-    path('create/', CreateOrderView.as_view(), name='create-order'),
-    path('<int:pk>/', OrderDetailView.as_view(), name='order-detail'),
-    path('<int:pk>/status/', UpdateOrderStatusView.as_view(), name='update-status'),
-    path('<int:pk>/cancel/', CancelOrderView.as_view(), name='cancel-order'),
+    path('', OrderListView.as_view(), name='order_list'),
+    path('<int:pk>/', OrderDetailView.as_view(), name='order_detail'),
+    path('<int:order_id>/tracking/', OrderTrackingView.as_view(), name='order_tracking'),
+    path('<int:pk>/status/', UpdateOrderStatusView.as_view(), name='update_order_status'),
 ]
