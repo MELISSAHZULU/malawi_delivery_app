@@ -57,51 +57,6 @@ class _HomeScreenState extends State<HomeScreen> {
       'deliveryTime': '5-10 min',
       'isPremium': true,
     },
-    {
-      'id': 5,
-      'name': 'Sobo Squash Syrup - Cherry',
-      'description': 'The iconic Malawian sweet syrup juice',
-      'price': 3600,
-      'rating': 4.6,
-      'deliveryTime': '5 min',
-      'isPremium': true,
-    },
-    {
-      'id': 6,
-      'name': 'Chombe Tea Blend (50 Bags)',
-      'description': 'Strong national black tea from Thyolo hills',
-      'price': 1900,
-      'rating': 4.7,
-      'deliveryTime': '5 min',
-      'isPremium': true,
-    },
-  ];
-
-  final List<Map<String, String>> _featuredShops = [
-    {
-      'name': 'Chambo & Nsima Hub',
-      'address': 'Area 18 Shopping Complex',
-      'rating': '4.8',
-      'time': '25 mins',
-    },
-    {
-      'name': 'Mzuzu Coffee Corner',
-      'address': 'Katoto Road Side',
-      'rating': '4.9',
-      'time': '15 mins',
-    },
-    {
-      'name': 'Limbe Central Market Stall',
-      'address': 'Limbe Market Road',
-      'rating': '4.5',
-      'time': '35 mins',
-    },
-    {
-      'name': 'Zomba Plateau Handcrafts',
-      'address': 'Chinyonga Junction',
-      'rating': '4.7',
-      'time': '40 mins',
-    },
   ];
 
   @override
@@ -114,27 +69,17 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header (fixed)
             _buildHeader(cartProvider),
-            // Offline Banner (fixed)
             OfflineBanner(queueCount: offlineProvider.queueLength),
-            // Main Scrollable Content
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Location Bar
                     _buildLocationBar(),
-                    // Search Bar
                     _buildSearchBar(),
-                    // Categories
                     _buildCategories(),
-                    // Live Tracking
                     _buildLiveTracking(),
-                    // Featured Shops Section
-                    _buildFeaturedShops(),
-                    // Products Grid
                     _buildProductsGrid(cartProvider),
                     const SizedBox(height: 16),
                   ],
@@ -151,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (index == 1) {
             Navigator.pushNamed(context, AppRoutes.tracking, arguments: 'MW-2843');
           } else if (index == 2) {
-            Navigator.pushNamed(context, AppRoutes.sellerDashboard);
+            Navigator.pushNamed(context, AppRoutes.sellerHome);
           }
         },
       ),
@@ -292,80 +237,6 @@ class _HomeScreenState extends State<HomeScreen> {
         orderNumber: 'MW-2843',
         status: 'On the way',
         eta: '12 min',
-      ),
-    );
-  }
-
-  Widget _buildFeaturedShops() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'FEATURED COMMERCE SHOPS',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF4A6478),
-            ),
-          ),
-          const SizedBox(height: 8),
-          ..._featuredShops.map((shop) => _buildShopCard(shop)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildShopCard(Map<String, String> shop) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
-          children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: const Color(0xFFEEF3F9),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.store, color: Color(0xFF2A7DE1)),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    shop['name']!,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    shop['address']!,
-                    style: TextStyle(color: const Color(0xFF4A6478), fontSize: 12),
-                  ),
-                  Row(
-                    children: [
-                      const Icon(Icons.star, size: 16, color: Color(0xFFF5B342)),
-                      Text(
-                        ' ${shop['rating']}',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(width: 12),
-                      const Icon(Icons.access_time, size: 14, color: Color(0xFF4A6478)),
-                      Text(
-                        ' ${shop['time']}',
-                        style: TextStyle(color: const Color(0xFF4A6478), fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -13,7 +13,7 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
-  String _selectedOperator = 'Airtel Money';
+  String _selectedOperator = 'airtel';
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
   bool _isLoading = false;
@@ -21,7 +21,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final cartProvider = Provider.of<CartProvider>(context);
-    final offlineProvider = Provider.of<OfflineQueueProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -87,10 +86,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    _buildSummaryRow('Basket Items Cost:', cartProvider.total - 1500),
+                    _buildSummaryRow('Basket Items Cost:', cartProvider.total),
                     _buildSummaryRow('Moto delivery to Area 18:', 1500),
                     const Divider(),
-                    _buildSummaryRow('TOTAL COST:', cartProvider.total, isTotal: true),
+                    _buildSummaryRow('TOTAL COST:', cartProvider.total + 1500, isTotal: true),
                   ],
                 ),
               ),
@@ -110,11 +109,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             Row(
               children: [
                 Expanded(
-                  child: _buildOperatorCard('Airtel Money', Icons.signal_cellular_alt),
+                  child: _buildOperatorCard('Airtel Money', Icons.signal_cellular_alt, 'airtel'),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: _buildOperatorCard('TNM Mpamba', Icons.signal_cellular_4_bar),
+                  child: _buildOperatorCard('TNM Mpamba', Icons.signal_cellular_4_bar, 'tnm'),
                 ),
               ],
             ),
@@ -158,7 +157,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 label: Text(
                   _isLoading
                       ? 'Processing...'
-                      : 'Pay MWK ${cartProvider.total.toStringAsFixed(0)} securely',
+                      : 'Pay MWK ${(cartProvider.total + 1500).toStringAsFixed(0)} securely',
                   style: const TextStyle(fontSize: 16),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -212,10 +211,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _buildOperatorCard(String name, IconData icon) {
-    final isSelected = _selectedOperator == name;
+  Widget _buildOperatorCard(String name, IconData icon, String value) {
+    final isSelected = _selectedOperator == value;
     return GestureDetector(
-      onTap: () => setState(() => _selectedOperator = name),
+      onTap: () => setState(() => _selectedOperator = value),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
@@ -259,10 +258,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       ),
     );
 
-    // Navigate to tracking
+    // Navigate to home
     Navigator.pushNamedAndRemoveUntil(
       context,
-      AppRoutes.home,
+      AppRoutes.buyerHome,
       (route) => false,
     );
   }

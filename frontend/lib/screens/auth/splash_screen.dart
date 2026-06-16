@@ -19,10 +19,28 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _navigateToNext() async {
     await Future.delayed(const Duration(seconds: 2));
+    
+    if (!mounted) return;
+    
     final authProvider = context.read<AuthProvider>();
 
     if (authProvider.isAuthenticated) {
-      Navigator.pushReplacementNamed(context, AppRoutes.home);
+      final user = authProvider.user;
+      if (user != null) {
+        String route;
+        if (user.isBuyer) {
+          route = AppRoutes.buyerHome;
+        } else if (user.isSeller) {
+          route = AppRoutes.sellerHome;
+        } else if (user.isDriver) {
+          route = AppRoutes.driverHome;
+        } else {
+          route = AppRoutes.buyerHome;
+        }
+        Navigator.pushReplacementNamed(context, route);
+      } else {
+        Navigator.pushReplacementNamed(context, AppRoutes.login);
+      }
     } else {
       Navigator.pushReplacementNamed(context, AppRoutes.login);
     }

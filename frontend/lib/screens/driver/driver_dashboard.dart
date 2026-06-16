@@ -79,9 +79,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
         onTap: (index) {
           setState(() => _currentIndex = index);
           if (index == 0) {
-            Navigator.pushReplacementNamed(context, AppRoutes.home);
+            Navigator.pushReplacementNamed(context, AppRoutes.buyerHome);
           } else if (index == 2) {
-            Navigator.pushNamed(context, AppRoutes.sellerDashboard);
+            Navigator.pushNamed(context, AppRoutes.sellerHome);
           }
         },
       ),

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/validators.dart';
+import '../../utils/constants.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({Key? key}) : super(key: key);
@@ -17,6 +18,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _storeNameController = TextEditingController();
+  final _addressController = TextEditingController();
   String _selectedRole = 'buyer';
   bool _obscurePassword = true;
 
@@ -26,6 +30,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _phoneController.dispose();
+    _storeNameController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 
@@ -91,6 +98,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 16),
 
+                // Phone
+                TextFormField(
+                  controller: _phoneController,
+                  decoration: const InputDecoration(
+                    labelText: 'Phone Number',
+                    prefixIcon: Icon(Icons.phone_outlined),
+                  ),
+                  keyboardType: TextInputType.phone,
+                  validator: (value) => Validators.validatePhone(value),
+                ),
+                const SizedBox(height: 16),
+
                 // Password
                 TextFormField(
                   controller: _passwordController,
@@ -134,13 +153,59 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     prefixIcon: Icon(Icons.person_outline),
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'buyer', child: Text('Buy items')),
-                    DropdownMenuItem(value: 'seller', child: Text('Sell items')),
-                    DropdownMenuItem(value: 'driver', child: Text('Deliver items')),
+                    DropdownMenuItem(value: 'buyer', child: Text('Buy items (Customer)')),
+                    DropdownMenuItem(value: 'seller', child: Text('Sell items (Vendor)')),
+                    DropdownMenuItem(value: 'driver', child: Text('Deliver items (Driver)')),
                   ],
                   onChanged: (value) => setState(() => _selectedRole = value!),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
+
+                // Seller-specific fields
+                if (_selectedRole == 'seller') ...[
+                  TextFormField(
+                    controller: _storeNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Store Name',
+                      prefixIcon: Icon(Icons.store),
+                    ),
+                    validator: (value) => Validators.validateRequired(value, 'Store Name'),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _addressController,
+                    decoration: const InputDecoration(
+                      labelText: 'Store Address',
+                      prefixIcon: Icon(Icons.location_on),
+                    ),
+                    validator: (value) => Validators.validateRequired(value, 'Address'),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Error message
+                if (authProvider.error != null)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, color: Colors.red.shade700),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            authProvider.error!,
+                            style: TextStyle(color: Colors.red.shade700),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (authProvider.error != null) const SizedBox(height: 16),
 
                 // Register Button
                 SizedBox(
@@ -150,9 +215,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ? null
                         : () async {
                             if (_formKey.currentState!.validate()) {
-                              // Register logic here
-                              // For now, just navigate to home
-                              Navigator.pushReplacementNamed(context, AppRoutes.home);
+                              final userData = {
+                                'username': _usernameController.text,
+                                'email': _emailController.text,
+                                'password': _passwordController.text,
+                                'role': _selectedRole,
+                                'phone_number': _phoneController.text,
+                                'store_name': _storeNameController.text,
+                                'address': _addressController.text,
+                              };
+                              final success = await authProvider.register(userData);
+                              if (success && mounted) {
+                                // Navigate based on role
+                                final user = authProvider.user;
+                                if (user != null) {
+                                  String route;
+                                  if (user.isBuyer) {
+                                    route = AppRoutes.buyerHome;
+                                  } else if (user.isSeller) {
+                                    route = AppRoutes.sellerHome;
+                                  } else if (user.isDriver) {
+                                    route = AppRoutes.driverHome;
+                                  } else {
+                                    route = AppRoutes.buyerHome;
+                                  }
+                                  Navigator.pushReplacementNamed(context, route);
+                                }
+                              }
                             }
                           },
                     child: authProvider.isLoading

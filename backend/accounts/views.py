@@ -1,8 +1,10 @@
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
-from .serializers import RegisterSerializer, UserSerializer, LoginSerializer
+from django.contrib.auth import authenticate
+from .serializers import RegisterSerializer, UserSerializer, ProfileSerializer
 from .models import User
 
 class RegisterView(generics.CreateAPIView):
@@ -11,66 +13,58 @@ class RegisterView(generics.CreateAPIView):
     
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        
-        # Create role-specific profile
-        role = user.role
-        if role == 'buyer':
-            BuyerProfile.objects.create(user=user)
-        elif role == 'seller':
-            SellerProfile.objects.create(
-                user=user,
-                store_name=request.data.get('store_name', 'My Store'),
-                address=request.data.get('address', ''),
-                latitude=request.data.get('latitude', 0),
-                longitude=request.data.get('longitude', 0)
-            )
-        elif role == 'driver':
-            DriverProfile.objects.create(
-                user=user,
-                vehicle_type=request.data.get('vehicle_type', 'motorcycle'),
-                vehicle_plate=request.data.get('vehicle_plate', '')
-            )
-        
-        refresh = RefreshToken.for_user(user)
+        if serializer.is_valid():
+            user = serializer.save()
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                'success': True,
+                'user': UserSerializer(user).data,
+                'access': str(refresh.access_token),
+                'refresh': str(refresh),
+                'message': f'Account created successfully as {user.role}'
+            }, status=status.HTTP_201_CREATED)
         return Response({
-            'user': UserSerializer(user).data,
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-        }, status=status.HTTP_201_CREATED)
+            'success': False,
+            'error': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 
-class LoginView(generics.GenericAPIView):
+class LoginView(TokenObtainPairView):
     permission_classes = [AllowAny]
-    serializer_class = LoginSerializer
     
-    def post(self, request):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data
+    def post(self, request, *args, **kwargs):
+        username = request.data.get('username')
+        password = request.data.get('password')
+        
+        if not username or not password:
+            return Response({
+                'error': 'Username and password are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        user = authenticate(username=username, password=password)
+        
+        if user is None:
+            return Response({
+                'error': 'Invalid credentials'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+        
+        if not user.is_active:
+            return Response({
+                'error': 'Account is disabled'
+            }, status=status.HTTP_403_FORBIDDEN)
         
         refresh = RefreshToken.for_user(user)
+        
         return Response({
+            'success': True,
             'user': UserSerializer(user).data,
-            'refresh': str(refresh),
             'access': str(refresh.access_token),
-        })
+            'refresh': str(refresh),
+            'message': 'Login successful'
+        }, status=status.HTTP_200_OK)
 
 class ProfileView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
-    serializer_class = UserSerializer
+    serializer_class = ProfileSerializer
     
     def get_object(self):
         return self.request.user
-
-class LogoutView(generics.GenericAPIView):
-    permission_classes = [IsAuthenticated]
-    
-    def post(self, request):
-        try:
-            refresh_token = request.data.get('refresh')
-            token = RefreshToken(refresh_token)
-            token.blacklist()
-            return Response({'message': 'Logged out successfully'})
-        except Exception:
-            return Response({'message': 'Logged out'}, status=status.HTTP_200_OK)

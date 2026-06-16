@@ -1,53 +1,66 @@
 from rest_framework import serializers
-from django.contrib.auth import authenticate
-from .models import User, BuyerProfile, SellerProfile, DriverProfile
+from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from .models import BuyerProfile, SellerProfile, DriverProfile
+
+User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
+    store_name = serializers.SerializerMethodField()
+    
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'role', 'phone_number', 
-                 'profile_picture', 'is_verified', 'location', 'created_at')
-        read_only_fields = ('id', 'created_at')
+        fields = ['id', 'username', 'email', 'role', 'phone_number', 'profile_picture', 'is_verified', 'location', 'store_name']
+    
+    def get_store_name(self, obj):
+        if hasattr(obj, 'seller_profile'):
+            return obj.seller_profile.store_name
+        return None
 
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=6)
-    role = serializers.ChoiceField(choices=User.ROLE_CHOICES)
+    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+    password2 = serializers.CharField(write_only=True, required=True)
+    store_name = serializers.CharField(required=False, allow_blank=True)
+    address = serializers.CharField(required=False, allow_blank=True)
     
     class Meta:
         model = User
-        fields = ('username', 'email', 'password', 'role', 'phone_number')
+        fields = ['username', 'email', 'password', 'password2', 'role', 'phone_number', 'store_name', 'address']
+    
+    def validate(self, attrs):
+        if attrs['password'] != attrs['password2']:
+            raise serializers.ValidationError({"password": "Password fields didn't match."})
+        return attrs
     
     def create(self, validated_data):
-        user = User.objects.create_user(
-            username=validated_data['username'],
-            email=validated_data.get('email', ''),
-            password=validated_data['password'],
-            role=validated_data['role'],
-            phone_number=validated_data.get('phone_number', '')
-        )
+        validated_data.pop('password2')
+        store_name = validated_data.pop('store_name', '')
+        address = validated_data.pop('address', '')
+        
+        user = User.objects.create_user(**validated_data)
+        
+        # Create role-specific profile
+        if user.role == 'buyer':
+            BuyerProfile.objects.create(user=user)
+        elif user.role == 'seller':
+            SellerProfile.objects.create(
+                user=user,
+                store_name=store_name or f"{user.username}'s Store",
+                address=address or '',
+                latitude=0,
+                longitude=0
+            )
+        elif user.role == 'driver':
+            DriverProfile.objects.create(
+                user=user,
+                vehicle_type='motorcycle',
+                vehicle_plate=''
+            )
+        
         return user
 
-class LoginSerializer(serializers.Serializer):
-    username = serializers.CharField()
-    password = serializers.CharField()
-    
-    def validate(self, data):
-        user = authenticate(**data)
-        if user and user.is_active:
-            return user
-        raise serializers.ValidationError("Invalid credentials")
-
-class BuyerProfileSerializer(serializers.ModelSerializer):
+class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
-        model = BuyerProfile
-        fields = '__all__'
-
-class SellerProfileSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = SellerProfile
-        fields = '__all__'
-
-class DriverProfileSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = DriverProfile
-        fields = '__all__'
+        model = User
+        fields = ['id', 'username', 'email', 'phone_number', 'profile_picture', 'location', 'role']
+        read_only_fields = ['id', 'role']

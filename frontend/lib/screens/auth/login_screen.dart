@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/validators.dart';
-import '../../widgets/custom_app_bar.dart';
+import '../../utils/constants.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -50,13 +50,37 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Welcome back!',
+                  'Malawi\'s Delivery Marketplace',
                   style: TextStyle(
                     color: Colors.grey.shade600,
                     fontSize: 16,
                   ),
                 ),
                 const SizedBox(height: 48),
+
+                // Error message
+                if (authProvider.error != null)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, color: Colors.red.shade700),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            authProvider.error!,
+                            style: TextStyle(color: Colors.red.shade700),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (authProvider.error != null) const SizedBox(height: 16),
 
                 // Username
                 TextFormField(
@@ -85,6 +109,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   validator: (value) => Validators.validatePassword(value),
                 ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {},
+                    child: const Text('Forgot Password?'),
+                  ),
+                ),
                 const SizedBox(height: 24),
 
                 // Login Button
@@ -100,7 +132,21 @@ class _LoginScreenState extends State<LoginScreen> {
                                 _passwordController.text,
                               );
                               if (success && mounted) {
-                                Navigator.pushReplacementNamed(context, AppRoutes.home);
+                                // Navigate based on role
+                                final user = authProvider.user;
+                                if (user != null) {
+                                  String route;
+                                  if (user.isBuyer) {
+                                    route = AppRoutes.buyerHome;
+                                  } else if (user.isSeller) {
+                                    route = AppRoutes.sellerHome;
+                                  } else if (user.isDriver) {
+                                    route = AppRoutes.driverHome;
+                                  } else {
+                                    route = AppRoutes.buyerHome;
+                                  }
+                                  Navigator.pushReplacementNamed(context, route);
+                                }
                               }
                             }
                           },

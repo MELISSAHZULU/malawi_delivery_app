@@ -8,7 +8,7 @@ import '../screens/buyer/product_detail_screen.dart';
 import '../screens/buyer/cart_screen.dart';
 import '../screens/buyer/checkout_screen.dart';
 import '../screens/buyer/order_tracking_screen.dart';
-import '../screens/seller/seller_dashboard.dart';
+import '../screens/seller/seller_home_screen.dart';
 import '../screens/driver/driver_dashboard.dart';
 import '../screens/shared/profile_screen.dart';
 
@@ -21,8 +21,12 @@ class AppNavigator {
         return MaterialPageRoute(builder: (_) => const LoginScreen());
       case AppRoutes.register:
         return MaterialPageRoute(builder: (_) => const RegisterScreen());
-      case AppRoutes.home:
+      case AppRoutes.buyerHome:
         return MaterialPageRoute(builder: (_) => const HomeScreen());
+      case AppRoutes.sellerHome:
+        return MaterialPageRoute(builder: (_) => const SellerHomeScreen());
+      case AppRoutes.driverHome:
+        return MaterialPageRoute(builder: (_) => const DriverDashboard());
       case AppRoutes.productDetail:
         final args = settings.arguments as Map<String, dynamic>?;
         return MaterialPageRoute(
@@ -37,10 +41,6 @@ class AppNavigator {
         return MaterialPageRoute(
           builder: (_) => OrderTrackingScreen(orderId: orderId),
         );
-      case AppRoutes.sellerDashboard:
-        return MaterialPageRoute(builder: (_) => const SellerDashboard());
-      case AppRoutes.driverDashboard:
-        return MaterialPageRoute(builder: (_) => const DriverDashboard());
       case AppRoutes.profile:
         return MaterialPageRoute(builder: (_) => const ProfileScreen());
       default:

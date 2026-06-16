@@ -4,9 +4,9 @@ class AppConstants {
   static const double defaultDeliveryFee = 1500.0;
   static const Duration orderTimeout = Duration(minutes: 30);
 
-  // API URLs - UPDATE THESE WITH YOUR BACKEND URL
-  static const String apiBaseUrl = 'https://your-api-url.com/api';
-  static const String wsBaseUrl = 'wss://your-api-url.com/ws';
+  // API URLs - Update these to match your backend
+  static const String apiBaseUrl = 'http://127.0.0.1:8000/api';
+  static const String wsBaseUrl = 'ws://127.0.0.1:8000/ws';
 
   // Storage Keys
   static const String userKey = 'user';
@@ -16,25 +16,8 @@ class AppConstants {
   static const String cartKey = 'cart';
   static const String themeKey = 'theme';
 
-  // Order Statuses
-  static const List<String> orderStatuses = [
-    'pending',
-    'confirmed',
-    'preparing',
-    'ready',
-    'picked_up',
-    'driving',
-    'arrived',
-    'delivered',
-    'cancelled'
-  ];
-
-  // Categories
-  static const List<String> categories = [
-    'ALL ITEMS',
-    'FOOD',
-    'GROCERY',
-    'CRAFTS',
-    'MARKET'
-  ];
+  // Role-based navigation
+  static const String buyerHome = '/buyer-home';
+  static const String sellerHome = '/seller-home';
+  static const String driverHome = '/driver-home';
 }
