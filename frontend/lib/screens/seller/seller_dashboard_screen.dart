@@ -234,9 +234,9 @@ class _DashboardTabState extends State<DashboardTab> {
             // Stats Row
             Row(
               children: [
-                _buildStatCard('RATING', '${user?.rating ?? 0.0}', Icons.star, Colors.amber),
                 _buildStatCard('PRODUCTS', '$productCount Live', Icons.inventory_2, Colors.blue),
-                _buildStatCard('SETTLED', '$completedOrders Completed', Icons.check_circle, Colors.green),
+                _buildStatCard('ORDERS', '$totalOrders Total', Icons.shopping_bag, Colors.orange),
+                _buildStatCard('SETTLED', '$completedOrders Done', Icons.check_circle, Colors.green),
               ],
             ),
             const SizedBox(height: 24),
@@ -313,7 +313,6 @@ class _DashboardTabState extends State<DashboardTab> {
                           'ADD PRODUCT',
                           Icons.add_shopping_cart,
                           () {
-                            // Navigate to Merchandise tab
                             final state = context.findAncestorStateOfType<_SellerDashboardScreenState>();
                             if (state != null) {
                               state.setState(() {
@@ -691,14 +690,14 @@ class _MerchandiseTabState extends State<MerchandiseTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      product.name,
+                      product.name ?? 'Unnamed',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
                     ),
                     Text(
-                      '${Formatters.currencyFormat(product.price)} ${product.categoryName ?? 'FOOD'}',
+                      '${Formatters.currencyFormat(product.price ?? 0)} ${product.categoryName ?? 'FOOD'}',
                       style: TextStyle(
                         color: Colors.grey.shade600,
                         fontSize: 12,
@@ -710,11 +709,11 @@ class _MerchandiseTabState extends State<MerchandiseTab> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: product.isAvailable ? Colors.green : Colors.red,
+                  color: product.isAvailable == true ? Colors.green : Colors.red,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  product.isAvailable ? 'IN STOCK' : 'OUT OF STOCK',
+                  product.isAvailable == true ? 'IN STOCK' : 'OUT OF STOCK',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 9,
@@ -726,7 +725,7 @@ class _MerchandiseTabState extends State<MerchandiseTab> {
           ),
           const SizedBox(height: 4),
           Text(
-            product.description,
+            product.description ?? '',
             style: TextStyle(
               color: Colors.grey.shade600,
               fontSize: 12,
@@ -872,7 +871,7 @@ class OrdersFeedTab extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Order: #${order.orderNumber}',
+                'Order: #${order.orderNumber ?? 'N/A'}',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
@@ -885,7 +884,7 @@ class OrdersFeedTab extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  settled ? 'DELIVERED & SETTLED' : order.status.toUpperCase(),
+                  settled ? 'DELIVERED & SETTLED' : (order.status?.toUpperCase() ?? 'PENDING'),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 9,
@@ -916,7 +915,7 @@ class OrdersFeedTab extends StatelessWidget {
             ...items.map((item) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 2),
               child: Text(
-                '${item.quantity}x ${item.name}',
+                '${item.quantity ?? 1}x ${item.name ?? 'Item'}',
                 style: const TextStyle(fontSize: 13),
               ),
             ))
@@ -990,7 +989,8 @@ class OrdersFeedTab extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime date) {
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'N/A';
     return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 }
