@@ -1,0 +1,61 @@
+# Dart/Flutter
+*.dart.tool
+*.lock
+*.iml
+*.iws
+.idea/
+.dart_tool/
+.packages
+.pub/
+.pub-cache/
+build/
+ios/Pods/
+android/.gradle/
+android/local.properties
+android/app/debug.keystore
+*.keystore
+*.jks
+**/generated/
+**/generated_plugin_registrant.dart
+**/version.g.dart
+**/.env
+**/secrets.dart
+
+# Mac
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Python virtual environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Django
+*.log
+db.sqlite3
+db.sqlite3-journal
+/media/
+/static/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
