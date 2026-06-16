@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/cart_provider.dart';
+import '../../providers/order_provider.dart';
 import '../../providers/offline_queue_provider.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/formatters.dart';
@@ -21,12 +22,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final cartProvider = Provider.of<CartProvider>(context);
+    final orderProvider = Provider.of<OrderProvider>(context);
+    final offlineProvider = Provider.of<OfflineQueueProvider>(context);
+
+    // If cart is empty, redirect to home
+    if (cartProvider.itemCount == 0 && !_isLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacementNamed(context, AppRoutes.buyerHome);
+      });
+    }
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Checkout'),
         backgroundColor: Colors.white,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -243,26 +257,93 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _processPayment() async {
+    if (_addressController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter your delivery address'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
-    // Simulate payment processing
-    await Future.delayed(const Duration(seconds: 2));
+    final cartProvider = Provider.of<CartProvider>(context, listen: false);
+    final orderProvider = Provider.of<OrderProvider>(context, listen: false);
+    final offlineProvider = Provider.of<OfflineQueueProvider>(context, listen: false);
 
-    setState(() => _isLoading = false);
+    try {
+      // Prepare order data
+      final orderData = {
+        'items': cartProvider.getOrderItems(),
+        'subtotal': cartProvider.total,
+        'delivery_fee': 1500,
+        'total': cartProvider.total + 1500,
+        'delivery_address': _addressController.text,
+        'payment_method': 'paychangu',
+        'mobile_number': _phoneController.text,
+        'operator': _selectedOperator,
+      };
 
-    // Show success message
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('✅ Payment successful! Order placed.'),
-        backgroundColor: Colors.green,
-      ),
-    );
+      // Simulate payment processing
+      await Future.delayed(const Duration(seconds: 2));
 
-    // Navigate to home
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      AppRoutes.buyerHome,
-      (route) => false,
-    );
+      // Create order via API (or offline if no connection)
+      final success = await orderProvider.createOrder(orderData);
+
+      if (success) {
+        // Clear cart
+        cartProvider.clearCart();
+
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Payment successful! Order placed.'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+
+          // Navigate to order tracking
+          final orderId = orderProvider.currentOrder?.id ?? 'MW-2843';
+          Navigator.pushReplacementNamed(
+            context,
+            AppRoutes.tracking,
+            arguments: orderId,
+          );
+        }
+      } else {
+        // If offline, save to offline queue
+        await offlineProvider.addToQueue(orderData);
+        cartProvider.clearCart();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('📡 Order saved offline. Will sync when online.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+          Navigator.pushReplacementNamed(context, AppRoutes.buyerHome);
+        }
+      }
+    } catch (e) {
+      print('Payment error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 }

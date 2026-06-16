@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/order.dart';
+import '../models/cart_item.dart';
 import '../services/api_service.dart';
 
 class OrderProvider extends ChangeNotifier {
@@ -45,6 +46,8 @@ class OrderProvider extends ChangeNotifier {
       final response = await _apiService.createOrder(orderData);
       if (response['success'] == true) {
         _currentOrder = Order.fromJson(response['data']);
+        // Add to orders list
+        _orders.insert(0, _currentOrder!);
         _isLoading = false;
         notifyListeners();
         return true;

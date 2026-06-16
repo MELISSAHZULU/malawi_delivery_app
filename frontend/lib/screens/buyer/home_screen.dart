@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../providers/cart_provider.dart';
+import '../../providers/offline_queue_provider.dart';
+import '../../providers/product_provider.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/category_chip.dart';
 import '../../widgets/offline_banner.dart';
 import '../../widgets/tracking_card.dart';
 import '../../widgets/bottom_nav_bar.dart';
-import '../../providers/cart_provider.dart';
-import '../../providers/offline_queue_provider.dart';
 import '../../routes/app_routes.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -19,50 +20,23 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   String _selectedCategory = 'ALL ITEMS';
+  final TextEditingController _searchController = TextEditingController();
 
-  final List<Map<String, dynamic>> _mockProducts = [
-    {
-      'id': 1,
-      'name': 'Nsima with Fried Lake Chambo',
-      'description': 'Fresh fried whole Chambo fish from Cape Maclear',
-      'price': 4800,
-      'rating': 4.8,
-      'deliveryTime': '20-30 min',
-      'isPremium': true,
-    },
-    {
-      'id': 2,
-      'name': 'Slow Stewed Local Chicken',
-      'description': 'Hard-body free-range local Malawian chicken',
-      'price': 7500,
-      'rating': 4.9,
-      'deliveryTime': '30-40 min',
-      'isPremium': true,
-    },
-    {
-      'id': 3,
-      'name': 'Bag of 5 Golden Mandasi',
-      'description': 'Crispy yet fluffy local sweet fried doughnuts',
-      'price': 1500,
-      'rating': 4.7,
-      'deliveryTime': '10-15 min',
-      'isPremium': true,
-    },
-    {
-      'id': 4,
-      'name': 'Mzuzu Ground Filter Coffee',
-      'description': 'Medium roast organic ground coffee beans',
-      'price': 8500,
-      'rating': 4.9,
-      'deliveryTime': '5-10 min',
-      'isPremium': true,
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    await Provider.of<ProductProvider>(context, listen: false).fetchProducts();
+  }
 
   @override
   Widget build(BuildContext context) {
     final cartProvider = Provider.of<CartProvider>(context);
     final offlineProvider = Provider.of<OfflineQueueProvider>(context);
+    final productProvider = Provider.of<ProductProvider>(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -72,17 +46,21 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildHeader(cartProvider),
             OfflineBanner(queueCount: offlineProvider.queueLength),
             Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLocationBar(),
-                    _buildSearchBar(),
-                    _buildCategories(),
-                    _buildLiveTracking(),
-                    _buildProductsGrid(cartProvider),
-                    const SizedBox(height: 16),
-                  ],
+              child: RefreshIndicator(
+                onRefresh: _loadProducts,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLocationBar(),
+                      _buildSearchBar(),
+                      _buildCategories(),
+                      _buildLiveTracking(),
+                      _buildProductsGrid(cartProvider, productProvider),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -93,9 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
         currentIndex: _currentIndex,
         onTap: (index) {
           setState(() => _currentIndex = index);
-          if (index == 0) {
-            // Already on home
-          } else if (index == 1) {
+          if (index == 1) {
             Navigator.pushNamed(context, AppRoutes.tracking, arguments: 'MW-2843');
           } else if (index == 2) {
             Navigator.pushNamed(context, AppRoutes.profile);
@@ -199,14 +175,35 @@ class _HomeScreenState extends State<HomeScreen> {
           borderRadius: BorderRadius.circular(30),
           border: Border.all(color: const Color(0xFFE8EDF2)),
         ),
-        child: const TextField(
-          decoration: InputDecoration(
-            hintText: 'Search chambo, tea, shops, sugar...',
-            hintStyle: TextStyle(color: Color(0xFF7F8D9E)),
-            prefixIcon: Icon(Icons.search, color: Color(0xFF5B6F82)),
-            border: InputBorder.none,
-            contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-          ),
+        child: Row(
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(left: 16),
+              child: Icon(Icons.search, color: Color(0xFF5B6F82)),
+            ),
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                decoration: const InputDecoration(
+                  hintText: 'Search chambo, tea, shops, sugar...',
+                  hintStyle: TextStyle(color: Color(0xFF7F8D9E)),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                ),
+                onChanged: (value) {
+                  Provider.of<ProductProvider>(context, listen: false).searchProducts(value);
+                },
+              ),
+            ),
+            if (_searchController.text.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.clear, size: 18),
+                onPressed: () {
+                  _searchController.clear();
+                  Provider.of<ProductProvider>(context, listen: false).searchProducts('');
+                },
+              ),
+          ],
         ),
       ),
     );
@@ -225,7 +222,12 @@ class _HomeScreenState extends State<HomeScreen> {
           return CategoryChip(
             label: categories[index],
             isActive: _selectedCategory == categories[index],
-            onTap: () => setState(() => _selectedCategory = categories[index]),
+            onTap: () {
+              setState(() {
+                _selectedCategory = categories[index];
+              });
+              Provider.of<ProductProvider>(context, listen: false).filterByCategory(categories[index]);
+            },
           );
         },
       ),
@@ -243,7 +245,54 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildProductsGrid(CartProvider cartProvider) {
+  Widget _buildProductsGrid(CartProvider cartProvider, ProductProvider productProvider) {
+    if (productProvider.isLoading) {
+      return const Padding(
+        padding: EdgeInsets.all(32.0),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (productProvider.error != null) {
+      return Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(Icons.error_outline, size: 48, color: Colors.red.shade400),
+              const SizedBox(height: 16),
+              Text(
+                'Error loading products',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+              Text(
+                productProvider.error!,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadProducts,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (productProvider.products.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(32.0),
+        child: Center(
+          child: Text(
+            'No products available',
+            style: TextStyle(color: Colors.grey),
+          ),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Column(
@@ -275,27 +324,27 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisSpacing: 14,
               mainAxisSpacing: 14,
             ),
-            itemCount: _mockProducts.length,
+            itemCount: productProvider.products.length,
             itemBuilder: (context, index) {
-              final product = _mockProducts[index];
+              final product = productProvider.products[index];
               return ProductCard(
-                name: product['name'],
-                price: product['price'].toDouble(),
-                rating: product['rating'].toDouble(),
-                deliveryTime: product['deliveryTime'],
-                isPremium: product['isPremium'],
+                name: product.name,
+                price: product.price,
+                rating: product.rating,
+                deliveryTime: product.deliveryTime,
+                isPremium: product.isPremium,
                 onTap: () {
                   Navigator.pushNamed(
                     context,
                     AppRoutes.productDetail,
-                    arguments: {'productId': product['id']},
+                    arguments: {'productId': product.id},
                   );
                 },
                 onAddToCart: () {
-                  cartProvider.addItem(price: product['price'].toDouble());
+                  cartProvider.addItem(price: product.price, name: product.name);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('${product['name']} added to cart!'),
+                      content: Text('${product.name} added to cart!'),
                       duration: const Duration(seconds: 1),
                     ),
                   );

@@ -4,7 +4,7 @@ class AppConstants {
   static const double defaultDeliveryFee = 1500.0;
   static const Duration orderTimeout = Duration(minutes: 30);
 
-  // API URLs - Update these to match your backend
+  // API URLs - Update this to match your backend
   static const String apiBaseUrl = 'http://127.0.0.1:8000/api';
   static const String wsBaseUrl = 'ws://127.0.0.1:8000/ws';
 

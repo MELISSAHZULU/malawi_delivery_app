@@ -1,29 +1,54 @@
 import 'package:flutter/material.dart';
+import '../models/cart_item.dart';
 
 class CartProvider extends ChangeNotifier {
-  int _itemCount = 0;
-  double _total = 0.0;
+  List<CartItem> _items = [];
 
-  int get itemCount => _itemCount;
-  double get total => _total;
+  List<CartItem> get items => _items;
+  int get itemCount => _items.length;
+  double get total => _items.fold(0, (sum, item) => sum + item.subtotal);
+  double get deliveryFee => 1500.0;
 
-  void addItem({double price = 4800}) {
-    _itemCount++;
-    _total += price;
+  void addItem({double price = 4800, String name = 'Nsima with Fried Lake Chambo'}) {
+    // Check if item already exists
+    final existingIndex = _items.indexWhere((item) => item.name == name);
+    if (existingIndex != -1) {
+      _items[existingIndex] = _items[existingIndex].copyWith(
+        quantity: _items[existingIndex].quantity + 1,
+      );
+    } else {
+      _items.add(CartItem(
+        productId: DateTime.now().millisecondsSinceEpoch,
+        name: name,
+        price: price,
+        quantity: 1,
+        sellerId: 1,
+        sellerName: 'Chambo & Nsima Hub',
+      ));
+    }
     notifyListeners();
   }
 
-  void removeItem({double price = 4800}) {
-    if (_itemCount > 0) {
-      _itemCount--;
-      _total -= price;
+  void removeItem({double price = 4800, String name = 'Nsima with Fried Lake Chambo'}) {
+    final existingIndex = _items.indexWhere((item) => item.name == name);
+    if (existingIndex != -1) {
+      if (_items[existingIndex].quantity > 1) {
+        _items[existingIndex] = _items[existingIndex].copyWith(
+          quantity: _items[existingIndex].quantity - 1,
+        );
+      } else {
+        _items.removeAt(existingIndex);
+      }
       notifyListeners();
     }
   }
 
   void clearCart() {
-    _itemCount = 0;
-    _total = 0.0;
+    _items.clear();
     notifyListeners();
+  }
+
+  List<Map<String, dynamic>> getOrderItems() {
+    return _items.map((item) => item.toJson()).toList();
   }
 }

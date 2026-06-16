@@ -23,4 +23,9 @@ class AppRoutes {
   static const String paymentMethods = '/payment-methods';
   static const String notifications = '/notifications';
   static const String helpSupport = '/help-support';
+  
+  // Seller screens
+  static const String manageProducts = '/manage-products';
+  static const String storeSettings = '/store-settings';
+  static const String salesAnalytics = '/sales-analytics';
 }

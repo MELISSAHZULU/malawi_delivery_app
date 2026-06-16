@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'providers/auth_provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/order_provider.dart';
+import 'providers/product_provider.dart';
 import 'providers/offline_queue_provider.dart';
 import 'routes/app_routes.dart';
 import 'routes/app_navigator.dart';
@@ -27,10 +28,11 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<AuthProvider>(
-          create: (_) => AuthProvider()..loadUser(), // Load user on startup
+          create: (_) => AuthProvider()..loadUser(),
         ),
         ChangeNotifierProvider<CartProvider>(create: (_) => CartProvider()),
         ChangeNotifierProvider<OrderProvider>(create: (_) => OrderProvider()),
+        ChangeNotifierProvider<ProductProvider>(create: (_) => ProductProvider()),
         ChangeNotifierProvider<OfflineQueueProvider>(
           create: (_) => OfflineQueueProvider(),
         ),
