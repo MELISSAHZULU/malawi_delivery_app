@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../widgets/bottom_nav_bar.dart';
 import '../../routes/app_routes.dart';
 
 class DriverDashboard extends StatefulWidget {
@@ -74,14 +73,33 @@ class _DriverDashboardState extends State<DriverDashboard> {
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavBar(
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
         currentIndex: _currentIndex,
+        selectedItemColor: const Color(0xFF0A1A2B),
+        unselectedItemColor: Colors.grey.shade600,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'HOME',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.track_changes),
+            label: 'TRACK',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            label: 'PROFILE',
+          ),
+        ],
         onTap: (index) {
           setState(() => _currentIndex = index);
           if (index == 0) {
-            Navigator.pushReplacementNamed(context, AppRoutes.buyerHome);
+            // Already on driver home
+          } else if (index == 1) {
+            Navigator.pushNamed(context, AppRoutes.tracking, arguments: 'MW-2843');
           } else if (index == 2) {
-            Navigator.pushNamed(context, AppRoutes.sellerHome);
+            Navigator.pushNamed(context, AppRoutes.profile);
           }
         },
       ),

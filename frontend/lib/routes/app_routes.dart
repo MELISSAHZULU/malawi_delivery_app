@@ -16,4 +16,11 @@ class AppRoutes {
   static const String profile = '/profile';
   static const String orders = '/orders';
   static const String addProduct = '/add-product';
+  
+  // Profile sub-screens
+  static const String orderHistory = '/order-history';
+  static const String savedAddresses = '/saved-addresses';
+  static const String paymentMethods = '/payment-methods';
+  static const String notifications = '/notifications';
+  static const String helpSupport = '/help-support';
 }

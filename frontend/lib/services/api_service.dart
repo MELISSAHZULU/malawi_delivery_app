@@ -36,7 +36,6 @@ class ApiService {
           'refresh': data['refresh'],
         };
       } else {
-        // Extract error message properly
         String errorMsg = 'Login failed';
         if (data['error'] is String) {
           errorMsg = data['error'];
@@ -60,6 +59,8 @@ class ApiService {
 
   Future<Map<String, dynamic>> register(Map<String, dynamic> userData) async {
     try {
+      print('Sending registration data: $userData');
+      
       final response = await http.post(
         Uri.parse('$baseUrl/auth/register/'),
         headers: {
@@ -86,7 +87,6 @@ class ApiService {
           'refresh': data['refresh'] ?? '',
         };
       } else {
-        // Extract error message properly
         String errorMsg = 'Registration failed';
         if (data['error'] is String) {
           errorMsg = data['error'];
@@ -196,21 +196,61 @@ class ApiService {
   Future<Map<String, dynamic>> getCurrentUser() async {
     try {
       final token = await _storage.read(key: 'access_token');
+      
+      if (token == null) {
+        return {'success': false, 'error': 'No token found'};
+      }
+      
       final response = await http.get(
         Uri.parse('$baseUrl/auth/profile/'),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
+          'Authorization': 'Bearer $token',
         },
       );
 
+      print('Get user response status: ${response.statusCode}');
+      print('Get user response body: ${response.body}');
+
       if (response.statusCode == 200) {
-        return {'success': true, 'data': json.decode(response.body)};
+        final data = json.decode(response.body);
+        return {'success': true, 'data': data};
+      } else if (response.statusCode == 401) {
+        // Token expired, try to refresh
+        final refreshed = await _refreshToken();
+        if (refreshed) {
+          return await getCurrentUser();
+        }
+        return {'success': false, 'error': 'Session expired'};
+      } else {
+        return {'success': false, 'error': 'Failed to get user'};
       }
-      return {'success': false, 'error': 'Failed to get user'};
     } catch (e) {
+      print('Get user error: $e');
       return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  Future<bool> _refreshToken() async {
+    final refreshToken = await _storage.read(key: 'refresh_token');
+    if (refreshToken == null) return false;
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/refresh/'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'refresh': refreshToken}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        await _storage.write(key: 'access_token', value: data['access']);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
     }
   }
 

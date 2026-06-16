@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/cart_provider.dart';
 import '../../routes/app_routes.dart';
-import '../../widgets/bottom_nav_bar.dart';
 
 class SellerHomeScreen extends StatefulWidget {
   const SellerHomeScreen({Key? key}) : super(key: key);
@@ -112,14 +110,33 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavBar(
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
         currentIndex: _currentIndex,
+        selectedItemColor: const Color(0xFF0A1A2B),
+        unselectedItemColor: Colors.grey.shade600,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'HOME',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.track_changes),
+            label: 'TRACK',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            label: 'PROFILE',
+          ),
+        ],
         onTap: (index) {
           setState(() => _currentIndex = index);
           if (index == 0) {
-            Navigator.pushReplacementNamed(context, AppRoutes.buyerHome);
+            // Already on seller home
           } else if (index == 1) {
             Navigator.pushNamed(context, AppRoutes.tracking, arguments: 'MW-2843');
+          } else if (index == 2) {
+            Navigator.pushNamed(context, AppRoutes.profile);
           }
         },
       ),

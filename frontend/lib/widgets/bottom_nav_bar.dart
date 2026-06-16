@@ -18,9 +18,18 @@ class BottomNavBar extends StatelessWidget {
       selectedItemColor: const Color(0xFF0A1A2B),
       unselectedItemColor: Colors.grey.shade600,
       items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.home), label: 'BUY'),
-        BottomNavigationBarItem(icon: Icon(Icons.track_changes), label: 'TRACK'),
-        BottomNavigationBarItem(icon: Icon(Icons.sell), label: 'SELL GOODS'),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home),
+          label: 'BUY',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.track_changes),
+          label: 'TRACK',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.person_outline),
+          label: 'PROFILE',
+        ),
       ],
       onTap: onTap,
     );

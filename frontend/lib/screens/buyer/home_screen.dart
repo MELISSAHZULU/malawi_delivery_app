@@ -93,10 +93,12 @@ class _HomeScreenState extends State<HomeScreen> {
         currentIndex: _currentIndex,
         onTap: (index) {
           setState(() => _currentIndex = index);
-          if (index == 1) {
+          if (index == 0) {
+            // Already on home
+          } else if (index == 1) {
             Navigator.pushNamed(context, AppRoutes.tracking, arguments: 'MW-2843');
           } else if (index == 2) {
-            Navigator.pushNamed(context, AppRoutes.sellerHome);
+            Navigator.pushNamed(context, AppRoutes.profile);
           }
         },
       ),

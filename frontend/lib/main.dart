@@ -26,7 +26,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider<AuthProvider>(create: (_) => AuthProvider()),
+        ChangeNotifierProvider<AuthProvider>(
+          create: (_) => AuthProvider()..loadUser(), // Load user on startup
+        ),
         ChangeNotifierProvider<CartProvider>(create: (_) => CartProvider()),
         ChangeNotifierProvider<OrderProvider>(create: (_) => OrderProvider()),
         ChangeNotifierProvider<OfflineQueueProvider>(

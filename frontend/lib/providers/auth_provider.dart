@@ -73,6 +73,18 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> loadUser() async {
+    try {
+      final response = await _apiService.getCurrentUser();
+      if (response['success'] == true) {
+        _user = User.fromJson(response['data']);
+        notifyListeners();
+      }
+    } catch (e) {
+      print('Error loading user: $e');
+    }
+  }
+
   Future<void> logout() async {
     await _apiService.logout();
     _user = null;

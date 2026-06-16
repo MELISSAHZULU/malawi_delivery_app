@@ -11,6 +11,11 @@ import '../screens/buyer/order_tracking_screen.dart';
 import '../screens/seller/seller_home_screen.dart';
 import '../screens/driver/driver_dashboard.dart';
 import '../screens/shared/profile_screen.dart';
+import '../screens/shared/order_history_screen.dart';
+import '../screens/shared/saved_addresses_screen.dart';
+import '../screens/shared/payment_methods_screen.dart';
+import '../screens/shared/notifications_screen.dart';
+import '../screens/shared/help_support_screen.dart';
 
 class AppNavigator {
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -43,6 +48,16 @@ class AppNavigator {
         );
       case AppRoutes.profile:
         return MaterialPageRoute(builder: (_) => const ProfileScreen());
+      case AppRoutes.orderHistory:
+        return MaterialPageRoute(builder: (_) => const OrderHistoryScreen());
+      case AppRoutes.savedAddresses:
+        return MaterialPageRoute(builder: (_) => const SavedAddressesScreen());
+      case AppRoutes.paymentMethods:
+        return MaterialPageRoute(builder: (_) => const PaymentMethodsScreen());
+      case AppRoutes.notifications:
+        return MaterialPageRoute(builder: (_) => const NotificationsScreen());
+      case AppRoutes.helpSupport:
+        return MaterialPageRoute(builder: (_) => const HelpSupportScreen());
       default:
         return MaterialPageRoute(
           builder: (_) => const Scaffold(

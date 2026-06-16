@@ -14,16 +14,19 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _navigateToNext();
+    _checkAuth();
   }
 
-  Future<void> _navigateToNext() async {
+  Future<void> _checkAuth() async {
     await Future.delayed(const Duration(seconds: 2));
     
     if (!mounted) return;
     
     final authProvider = context.read<AuthProvider>();
-
+    
+    // Reload user data
+    await authProvider.loadUser();
+    
     if (authProvider.isAuthenticated) {
       final user = authProvider.user;
       if (user != null) {
