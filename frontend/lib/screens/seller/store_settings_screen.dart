@@ -156,10 +156,9 @@ class _StoreSettingsScreenState extends State<StoreSettingsScreen> {
               Card(
                 child: SwitchListTile(
                   title: const Text('Store Active'),
-                  subtitle: Text(
+                  subtitle: const Text(
                     'Your store is visible to customers',
                     style: TextStyle(
-                      color: Colors.grey.shade600,
                       fontSize: 12,
                     ),
                   ),

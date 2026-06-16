@@ -45,3 +45,17 @@ class SellerProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     
     def get_queryset(self):
         return Product.objects.filter(seller__user=self.request.user)
+
+# marketplace/views.py
+class SellerProductDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ProductSerializer
+    
+    def get_queryset(self):
+        return Product.objects.filter(seller__user=self.request.user)
+class SellerProductDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ProductSerializer
+    
+    def get_queryset(self):
+        return Product.objects.filter(seller__user=self.request.user)

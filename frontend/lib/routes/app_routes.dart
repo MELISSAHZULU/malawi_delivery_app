@@ -15,7 +15,12 @@ class AppRoutes {
   static const String tracking = '/tracking';
   static const String profile = '/profile';
   static const String orders = '/orders';
+  
+  // Seller screens
   static const String addProduct = '/add-product';
+  static const String manageProducts = '/manage-products';
+  static const String storeSettings = '/store-settings';
+  static const String salesAnalytics = '/sales-analytics';
   
   // Profile sub-screens
   static const String orderHistory = '/order-history';
@@ -23,9 +28,4 @@ class AppRoutes {
   static const String paymentMethods = '/payment-methods';
   static const String notifications = '/notifications';
   static const String helpSupport = '/help-support';
-  
-  // Seller screens
-  static const String manageProducts = '/manage-products';
-  static const String storeSettings = '/store-settings';
-  static const String salesAnalytics = '/sales-analytics';
 }

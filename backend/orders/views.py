@@ -142,3 +142,18 @@ class CancelOrderView(generics.GenericAPIView):
             return Response({'error': 'Order cannot be cancelled'}, status=status.HTTP_400_BAD_REQUEST)
         except Order.DoesNotExist:
             return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+# orders/views.py
+class WeeklyEarningsView(APIView):
+    def get(self, request):
+        # Calculate earnings for last 7 days
+        pass
+
+
+# orders/views.py
+class UpdateOrderStatusView(generics.UpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = OrderSerializer
+    
+    def get_queryset(self):
+        return Order.objects.filter(seller__user=self.request.user)

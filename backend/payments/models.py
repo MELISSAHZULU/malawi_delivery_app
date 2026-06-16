@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 from orders.models import Order
+from accounts.models import SellerProfile
 
 class PaymentTransaction(models.Model):
     STATUS_CHOICES = (
@@ -53,3 +54,27 @@ class PaymentTransaction(models.Model):
         self.save()
         self.order.payment_status = 'failed'
         self.order.save()
+
+
+class SellerWallet(models.Model):
+    seller = models.OneToOneField(SellerProfile, on_delete=models.CASCADE, related_name='wallet')
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_earned = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_withdrawn = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.seller.store_name} - MWK {self.balance}"
+    
+    def add_earnings(self, amount):
+        self.balance += amount
+        self.total_earned += amount
+        self.save()
+    
+    def withdraw(self, amount):
+        if self.balance >= amount:
+            self.balance -= amount
+            self.total_withdrawn += amount
+            self.save()
+            return True
+        return False

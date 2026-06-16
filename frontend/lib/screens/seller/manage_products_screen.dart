@@ -98,7 +98,7 @@ class _ManageProductsScreenState extends State<ManageProductsScreen> {
                                       return Icon(Icons.image, color: Colors.grey.shade400);
                                     },
                                   )
-                                : const Icon(Icons.food_bank, color: Colors.grey.shade400),
+                                : Icon(Icons.food_bank, color: Colors.grey.shade400),
                           ),
                           title: Text(
                             product.name,
@@ -111,7 +111,9 @@ class _ManageProductsScreenState extends State<ManageProductsScreen> {
                                 Formatters.currencyFormat(product.price),
                                 style: const TextStyle(fontWeight: FontWeight.w600),
                               ),
-                              Row(
+                              const SizedBox(height: 4),
+                              Wrap(
+                                spacing: 4,
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -127,8 +129,7 @@ class _ManageProductsScreenState extends State<ManageProductsScreen> {
                                       ),
                                     ),
                                   ),
-                                  if (product.isPremium) ...[
-                                    const SizedBox(width: 4),
+                                  if (product.isPremium)
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
@@ -143,7 +144,6 @@ class _ManageProductsScreenState extends State<ManageProductsScreen> {
                                         ),
                                       ),
                                     ),
-                                  ],
                                 ],
                               ),
                             ],

@@ -78,3 +78,11 @@ class ProfileView(generics.RetrieveUpdateAPIView):
     
     def get_object(self):
         return self.request.user
+
+# accounts/views.py
+class UpdateStoreView(generics.UpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = SellerProfileSerializer
+    
+    def get_object(self):
+        return self.request.user.seller_profile

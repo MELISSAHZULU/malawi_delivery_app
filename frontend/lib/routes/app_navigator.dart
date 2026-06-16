@@ -9,6 +9,8 @@ import '../screens/buyer/cart_screen.dart';
 import '../screens/buyer/checkout_screen.dart';
 import '../screens/buyer/order_tracking_screen.dart';
 import '../screens/seller/seller_home_screen.dart';
+import '../screens/seller/seller_dashboard_screen.dart';
+import '../screens/seller/add_product_screen.dart';
 import '../screens/seller/manage_products_screen.dart';
 import '../screens/seller/store_settings_screen.dart';
 import '../screens/seller/sales_analytics_screen.dart';
@@ -61,6 +63,8 @@ class AppNavigator {
         return MaterialPageRoute(builder: (_) => const NotificationsScreen());
       case AppRoutes.helpSupport:
         return MaterialPageRoute(builder: (_) => const HelpSupportScreen());
+      case AppRoutes.addProduct:
+        return MaterialPageRoute(builder: (_) => const AddProductScreen());
       case AppRoutes.manageProducts:
         return MaterialPageRoute(builder: (_) => const ManageProductsScreen());
       case AppRoutes.storeSettings:
