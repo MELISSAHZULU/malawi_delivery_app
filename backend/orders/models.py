@@ -1,5 +1,7 @@
 from django.db import models
-from accounts.models import BuyerProfile, SellerProfile, DriverProfile
+from django.conf import settings
+from django.utils import timezone
+from accounts.models import BuyerProfile, SellerProfile
 
 class Order(models.Model):
     STATUS_CHOICES = (
@@ -16,19 +18,26 @@ class Order(models.Model):
     
     buyer = models.ForeignKey(BuyerProfile, on_delete=models.CASCADE, related_name='orders')
     seller = models.ForeignKey(SellerProfile, on_delete=models.CASCADE, related_name='orders')
-    driver = models.ForeignKey(DriverProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
+    driver = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='driver_orders',
+        limit_choices_to={'role': 'driver'}
+    )
     
     order_number = models.CharField(max_length=20, unique=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     
     items = models.JSONField()
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
-    delivery_fee = models.DecimalField(max_digits=10, decimal_places=2)
+    delivery_fee = models.DecimalField(max_digits=10, decimal_places=2, default=1500)
     total = models.DecimalField(max_digits=10, decimal_places=2)
     
     delivery_address = models.CharField(max_length=255)
-    delivery_latitude = models.DecimalField(max_digits=9, decimal_places=6)
-    delivery_longitude = models.DecimalField(max_digits=9, decimal_places=6)
+    delivery_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    delivery_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     
     payment_method = models.CharField(max_length=20, default='paychangu')
     payment_status = models.CharField(max_length=20, default='pending')
@@ -38,19 +47,29 @@ class Order(models.Model):
     estimated_delivery_time = models.DateTimeField(null=True, blank=True)
     actual_delivery_time = models.DateTimeField(null=True, blank=True)
     
-    is_offline = models.BooleanField(default=False)
-    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    
+    def __str__(self):
+        return f"Order #{self.order_number} - {self.buyer.user.username}"
+    
     def save(self, *args, **kwargs):
         if not self.order_number:
             import random
             self.order_number = f"MW{random.randint(1000, 9999)}{random.randint(100, 999)}"
         super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"Order #{self.order_number}"
+    
+    def add_tracking_update(self, status, location=None, note=None):
+        update = {
+            'status': status,
+            'timestamp': timezone.now().isoformat(),
+            'location': location or {},
+            'note': note or ''
+        }
+        self.tracking_updates.append(update)
+        self.status = status
+        self.save()
+        return update
 
 class OrderTracking(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='tracking')
@@ -58,6 +77,6 @@ class OrderTracking(models.Model):
     location = models.JSONField(default=dict)
     note = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-
+    
     def __str__(self):
-        return f"{self.order.order_number} - {self.status}"
+        return f"{self.order.order_number} - {self.status} at {self.created_at}"

@@ -79,7 +79,7 @@ class CartScreen extends StatelessWidget {
                             children: [
                               IconButton(
                                 icon: const Icon(Icons.remove),
-                                onPressed: () => cartProvider.removeItem(4800),
+                                onPressed: () => cartProvider.removeItem(),
                               ),
                               Text('${cartProvider.itemCount}'),
                               IconButton(
@@ -93,7 +93,6 @@ class CartScreen extends StatelessWidget {
                     },
                   ),
                 ),
-                // Payment Summary
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -111,7 +110,7 @@ class CartScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text('Basket Subtotal:'),
-                          Text(Formatters.currencyFormat(cartProvider.total - 1500)),
+                          Text(Formatters.currencyFormat(cartProvider.total)),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -131,7 +130,7 @@ class CartScreen extends StatelessWidget {
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                           Text(
-                            Formatters.currencyFormat(cartProvider.total),
+                            Formatters.currencyFormat(cartProvider.total + 1500),
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 18,
