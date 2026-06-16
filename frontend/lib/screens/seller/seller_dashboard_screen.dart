@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/product_provider.dart';
+import '../../providers/order_provider.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/formatters.dart';
 
@@ -12,13 +14,32 @@ class SellerDashboardScreen extends StatefulWidget {
 }
 
 class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
-  int _selectedTab = 0;
+  int _selectedIndex = 0;
 
   final List<Widget> _tabs = [
     const DashboardTab(),
     const MerchandiseTab(),
     const OrdersFeedTab(),
     const ShopProfileTab(),
+  ];
+
+  final List<BottomNavigationBarItem> _bottomNavItems = const [
+    BottomNavigationBarItem(
+      icon: Icon(Icons.dashboard),
+      label: 'ghts',
+    ),
+    BottomNavigationBarItem(
+      icon: Icon(Icons.inventory_2),
+      label: 'Merchandise',
+    ),
+    BottomNavigationBarItem(
+      icon: Icon(Icons.shopping_bag),
+      label: 'Orders Feed',
+    ),
+    BottomNavigationBarItem(
+      icon: Icon(Icons.store),
+      label: 'Shop Profile',
+    ),
   ];
 
   @override
@@ -35,7 +56,7 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
             const Text(
               'MALAWIAN MERCHANT PORTAL',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.bold,
                 color: Colors.grey,
               ),
@@ -52,264 +73,287 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
         ),
         backgroundColor: Colors.white,
         elevation: 0,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(50),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                _buildTabButton('ghts', 0),
-                _buildTabButton('Merchandise', 1),
-                _buildTabButton('Orders Feed', 2),
-                _buildTabButton('Shop Profile', 3),
-              ],
-            ),
-          ),
-        ),
       ),
-      body: _tabs[_selectedTab],
-    );
-  }
-
-  Widget _buildTabButton(String title, int index) {
-    final isSelected = _selectedTab == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _selectedTab = index),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
-                color: isSelected ? const Color(0xFF0A1A2B) : Colors.transparent,
-                width: 2,
-              ),
-            ),
-          ),
-          child: Text(
-            title,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isSelected ? const Color(0xFF0A1A2B) : Colors.grey,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              fontSize: 13,
-            ),
-          ),
-        ),
+      body: _tabs[_selectedIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        currentIndex: _selectedIndex,
+        selectedItemColor: const Color(0xFF0A1A2B),
+        unselectedItemColor: Colors.grey,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        items: _bottomNavItems,
       ),
     );
   }
 }
 
 // ==================== DASHBOARD TAB ====================
-class DashboardTab extends StatelessWidget {
+class DashboardTab extends StatefulWidget {
   const DashboardTab({Key? key}) : super(key: key);
 
   @override
+  State<DashboardTab> createState() => _DashboardTabState();
+}
+
+class _DashboardTabState extends State<DashboardTab> {
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final productProvider = Provider.of<ProductProvider>(context, listen: false);
+    final orderProvider = Provider.of<OrderProvider>(context, listen: false);
+    
+    await Future.wait([
+      productProvider.fetchProducts(),
+      orderProvider.fetchOrders(),
+    ]);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Location
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.location_on, size: 18, color: Color(0xFF2A7DE1)),
-                const SizedBox(width: 8),
-                const Text(
-                  'DELIVERY LOCATION',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Lilongwe ✔ / Area 18 ✔',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Spacer(),
-                Icon(Icons.edit, size: 16, color: Colors.grey.shade400),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
+    final productProvider = Provider.of<ProductProvider>(context);
+    final orderProvider = Provider.of<OrderProvider>(context);
+    final authProvider = Provider.of<AuthProvider>(context);
+    final user = authProvider.user;
 
-          // Wallet Card
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0A1A2B), Color(0xFF1A2C3F)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+    final productCount = productProvider.products.where((p) => p.isAvailable).length;
+    final totalOrders = orderProvider.orders.length;
+    final completedOrders = orderProvider.orders.where((o) => o.status == 'delivered').length;
+    
+    final totalEarnings = orderProvider.orders
+        .where((o) => o.status == 'delivered')
+        .fold(0.0, (sum, o) => sum + o.total);
+
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Location
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
               ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'MY COMMERCE WALLET (MWK)',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white70,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'MWK 58,000',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+              child: Row(
+                children: [
+                  const Icon(Icons.location_on, size: 18, color: Color(0xFF2A7DE1)),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'DELIVERY LOCATION',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
                     ),
-                    ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                      child: const Text(
-                        'WITHDRAW CASH',
-                        style: TextStyle(
-                          fontSize: 11,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    user?.location ?? 'Lilongwe / Area 18',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(Icons.edit, size: 16, color: Colors.grey.shade400),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Wallet Card
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0A1A2B), Color(0xFF1A2C3F)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'MY COMMERCE WALLET (MWK)',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white70,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        Formatters.currencyFormat(totalEarnings),
+                        style: const TextStyle(
+                          fontSize: 28,
                           fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                      ElevatedButton(
+                        onPressed: () {},
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
+                        child: const Text(
+                          'WITHDRAW CASH',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
-          // Stats Row
-          Row(
-            children: [
-              _buildStatCard('RATING', '4.8 / 5.0', Icons.star, Colors.amber),
-              _buildStatCard('PRODUCTS', '2 Live', Icons.inventory_2, Colors.blue),
-              _buildStatCard('SETTLED', '1 Completed', Icons.check_circle, Colors.green),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          // Weekly Earnings Chart
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            // Stats Row
+            Row(
               children: [
-                const Text(
-                  'WEEKLY EARNING SALES (MWK)',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Total: MWK 148,000',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildBar(30, 'MON'),
-                    _buildBar(45, 'TUE'),
-                    _buildBar(60, 'WED'),
-                    _buildBar(80, 'THU'),
-                    _buildBar(70, 'FRI'),
-                    _buildBar(90, 'SAT'),
-                    _buildBar(50, 'SUN'),
-                  ],
-                ),
+                _buildStatCard('RATING', '${user?.rating ?? 0.0}', Icons.star, Colors.amber),
+                _buildStatCard('PRODUCTS', '$productCount Live', Icons.inventory_2, Colors.blue),
+                _buildStatCard('SETTLED', '$completedOrders Completed', Icons.check_circle, Colors.green),
               ],
             ),
-          ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 24),
 
-          // Quick Actions
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'QUICK SYSTEM OPERATIONS',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey,
+            // Weekly Earnings Chart
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'WEEKLY EARNING SALES (MWK)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildQuickAction(
-                        'ADD PRODUCT',
-                        Icons.add_shopping_cart,
-                        () => Navigator.pushNamed(context, AppRoutes.addProduct),
-                      ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Total: ${Formatters.currencyFormat(totalEarnings)}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
-                    Expanded(
-                      child: _buildQuickAction(
-                        'VIEW ORDERS',
-                        Icons.shopping_bag,
-                        () {},
-                      ),
-                    ),
-                    Expanded(
-                      child: _buildQuickAction(
-                        'ANALYTICS',
-                        Icons.analytics,
-                        () {},
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildBar(30, 'MON'),
+                      _buildBar(45, 'TUE'),
+                      _buildBar(60, 'WED'),
+                      _buildBar(80, 'THU'),
+                      _buildBar(70, 'FRI'),
+                      _buildBar(90, 'SAT'),
+                      _buildBar(50, 'SUN'),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-        ],
+            const SizedBox(height: 16),
+
+            // Quick Actions
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'QUICK SYSTEM OPERATIONS',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildQuickAction(
+                          'ADD PRODUCT',
+                          Icons.add_shopping_cart,
+                          () {
+                            // Navigate to Merchandise tab
+                            final state = context.findAncestorStateOfType<_SellerDashboardScreenState>();
+                            if (state != null) {
+                              state.setState(() {
+                                state._selectedIndex = 1;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                      Expanded(
+                        child: _buildQuickAction(
+                          'VIEW ORDERS',
+                          Icons.shopping_bag,
+                          () {
+                            final state = context.findAncestorStateOfType<_SellerDashboardScreenState>();
+                            if (state != null) {
+                              state.setState(() {
+                                state._selectedIndex = 2;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                      Expanded(
+                        child: _buildQuickAction(
+                          'ANALYTICS',
+                          Icons.analytics,
+                          () {
+                            Navigator.pushNamed(context, AppRoutes.salesAnalytics);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
       ),
     );
   }
@@ -419,182 +463,216 @@ class _MerchandiseTabState extends State<MerchandiseTab> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Add Product Form
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Text(
-                      'ADD COMMERCE PRODUCT',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'LIVE SYNC',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Form(
-                  key: _formKey,
-                  child: Column(
+    final productProvider = Provider.of<ProductProvider>(context);
+    final sellerProducts = productProvider.products;
+
+    return RefreshIndicator(
+      onRefresh: () => productProvider.fetchProducts(),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Add Product Form
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      TextFormField(
-                        controller: _itemNameController,
-                        decoration: const InputDecoration(
-                          labelText: 'ITEM NAME',
-                          hintText: 'e.g. Traditional Mandasi',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        ),
-                        validator: (v) => v!.isEmpty ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _priceController,
-                        decoration: const InputDecoration(
-                          labelText: 'PRICE (Mk)',
-                          hintText: 'e.g. 1500',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (v) => v!.isEmpty ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: _classification,
-                        decoration: const InputDecoration(
-                          labelText: 'CLASSIFICATION',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        ),
-                        items: ['FOOD', 'GROCERY', 'CRAFTS', 'MARKET'].map((c) {
-                          return DropdownMenuItem(value: c, child: Text(c));
-                        }).toList(),
-                        onChanged: (v) => setState(() => _classification = v!),
-                      ),
-                      const SizedBox(height: 12),
                       const Text(
-                        'STALL WRITER',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Chambo & Nsima Hub',
+                        'ADD COMMERCE PRODUCT',
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _descriptionController,
-                        decoration: const InputDecoration(
-                          labelText: 'DESCRIPTION & SOURCE',
-                          hintText: 'State local ingredients, handiwork details, portions...',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        maxLines: 2,
-                        validator: (v) => v!.isEmpty ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            if (_formKey.currentState!.validate()) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Product published!')),
-                              );
-                              _itemNameController.clear();
-                              _priceController.clear();
-                              _descriptionController.clear();
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0A1A2B),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                          child: const Text(
-                            'PUBLISH INSTANT LIVE LISTING',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        child: const Text(
+                          'LIVE SYNC',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 16),
+                  Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        TextFormField(
+                          controller: _itemNameController,
+                          decoration: const InputDecoration(
+                            labelText: 'ITEM NAME',
+                            hintText: 'e.g. Traditional Mandasi',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          validator: (v) => v!.isEmpty ? 'Required' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _priceController,
+                          decoration: const InputDecoration(
+                            labelText: 'PRICE (Mk)',
+                            hintText: 'e.g. 1500',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (v) => v!.isEmpty ? 'Required' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: _classification,
+                          decoration: const InputDecoration(
+                            labelText: 'CLASSIFICATION',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          items: ['FOOD', 'GROCERY', 'CRAFTS', 'MARKET'].map((c) {
+                            return DropdownMenuItem(value: c, child: Text(c));
+                          }).toList(),
+                          onChanged: (v) => setState(() => _classification = v!),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'STALL WRITER',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Consumer<AuthProvider>(
+                          builder: (context, auth, _) {
+                            return Text(
+                              auth.user?.storeName ?? 'My Store',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _descriptionController,
+                          decoration: const InputDecoration(
+                            labelText: 'DESCRIPTION & SOURCE',
+                            hintText: 'State local ingredients, handiwork details, portions...',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          maxLines: 2,
+                          validator: (v) => v!.isEmpty ? 'Required' : null,
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              if (_formKey.currentState!.validate()) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Product published!')),
+                                );
+                                _itemNameController.clear();
+                                _priceController.clear();
+                                _descriptionController.clear();
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0A1A2B),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            child: const Text(
+                              'PUBLISH INSTANT LIVE LISTING',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Product Catalog
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'MY COMMERCE CATALOG (${sellerProducts.length} ITEMS)',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
+                if (productProvider.isLoading)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
               ],
             ),
-          ),
-          const SizedBox(height: 16),
-
-          // Product Catalog
-          const Text(
-            'MY COMMERCE CATALOG (2 ITEMS)',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          _buildCatalogItem(
-            'Nsima with Fried Lake Chambo',
-            'Mk 4,800',
-            'FOOD',
-            'Fresh fried whole Chambo fish from Cape Maclear, served with two lumps of white corn nsima, tomato-onion gravy, and...',
-            true,
-          ),
-          _buildCatalogItem(
-            'Slow Stewed Local Chicken (K...)',
-            'Mk 7,500',
-            'FOOD',
-            'Hard-body free-range local Malawian chicken cooked slowly with natural ginger, garlic, and tomato curry. High energy.',
-            true,
-          ),
-        ],
+            const SizedBox(height: 8),
+            if (sellerProducts.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: const Center(
+                  child: Column(
+                    children: [
+                      Icon(Icons.inventory_2, size: 48, color: Colors.grey),
+                      SizedBox(height: 8),
+                      Text(
+                        'No products yet',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                      Text(
+                        'Add your first product above',
+                        style: TextStyle(color: Colors.grey, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              ...sellerProducts.map((product) => _buildCatalogItem(product)),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildCatalogItem(String name, String price, String category, String description, bool inStock) {
+  Widget _buildCatalogItem(dynamic product) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -613,14 +691,14 @@ class _MerchandiseTabState extends State<MerchandiseTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      name,
+                      product.name,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
                     ),
                     Text(
-                      '$price $category',
+                      '${Formatters.currencyFormat(product.price)} ${product.categoryName ?? 'FOOD'}',
                       style: TextStyle(
                         color: Colors.grey.shade600,
                         fontSize: 12,
@@ -632,11 +710,11 @@ class _MerchandiseTabState extends State<MerchandiseTab> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: inStock ? Colors.green : Colors.red,
+                  color: product.isAvailable ? Colors.green : Colors.red,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  inStock ? 'IN STOCK' : 'OUT OF STOCK',
+                  product.isAvailable ? 'IN STOCK' : 'OUT OF STOCK',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 9,
@@ -648,7 +726,7 @@ class _MerchandiseTabState extends State<MerchandiseTab> {
           ),
           const SizedBox(height: 4),
           Text(
-            description,
+            product.description,
             style: TextStyle(
               color: Colors.grey.shade600,
               fontSize: 12,
@@ -692,82 +770,93 @@ class OrdersFeedTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'PENDING CUSTOMER ORDERS',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  '0 Pending Prep',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
+    final orderProvider = Provider.of<OrderProvider>(context);
+    final pendingOrders = orderProvider.orders.where((o) => o.status != 'delivered' && o.status != 'cancelled').toList();
+    final completedOrders = orderProvider.orders.where((o) => o.status == 'delivered').toList();
 
-          // Order Card
-          _buildOrderCard(
-            orderNumber: 'rd-101',
-            status: 'DELIVERED & SETTLED',
-            time: '09:06',
-            payment: 'AIRTEL mobile Pay',
-            items: ['1x Nshima with Fried Lake Chambo'],
-            total: 'MWK 4,800',
-            location: 'Lilongwe District • Area 18',
-            landmark: 'Near the reservoir tower',
-            phone: '+265 999 444 888',
-            settled: true,
-          ),
-          _buildOrderCard(
-            orderNumber: 'rd-102',
-            status: 'PENDING PREP',
-            time: '10:30',
-            payment: 'TNM Mpamba',
-            items: ['2x Slow Stewed Local Chicken', '1x Bag of Mandasi'],
-            total: 'MWK 16,500',
-            location: 'Lilongwe District • Area 25',
-            landmark: 'Near the market',
-            phone: '+265 888 555 777',
-            settled: false,
-          ),
-        ],
+    return RefreshIndicator(
+      onRefresh: () => orderProvider.fetchOrders(),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'PENDING CUSTOMER ORDERS',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    '${pendingOrders.length} Pending',
+                    style: TextStyle(
+                      color: pendingOrders.isEmpty ? Colors.green : Colors.orange,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            if (pendingOrders.isEmpty && completedOrders.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: const Center(
+                  child: Column(
+                    children: [
+                      Icon(Icons.shopping_bag_outlined, size: 48, color: Colors.grey),
+                      SizedBox(height: 8),
+                      Text(
+                        'No orders yet',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                      Text(
+                        'Orders will appear here when customers place them',
+                        style: TextStyle(color: Colors.grey, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else ...[
+              if (pendingOrders.isNotEmpty)
+                ...pendingOrders.map((order) => _buildOrderCard(order, settled: false)),
+              
+              if (pendingOrders.isNotEmpty && completedOrders.isNotEmpty)
+                const SizedBox(height: 16),
+              
+              if (completedOrders.isNotEmpty)
+                ...completedOrders.map((order) => _buildOrderCard(order, settled: true)),
+            ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildOrderCard({
-    required String orderNumber,
-    required String status,
-    required String time,
-    required String payment,
-    required List<String> items,
-    required String total,
-    required String location,
-    required String landmark,
-    required String phone,
-    required bool settled,
-  }) {
+  Widget _buildOrderCard(dynamic order, {required bool settled}) {
+    final items = order.items ?? [];
+    final total = order.total ?? 0;
+    final deliveryAddress = order.deliveryAddress ?? 'N/A';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -783,7 +872,7 @@ class OrdersFeedTab extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Order: #$orderNumber',
+                'Order: #${order.orderNumber}',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
@@ -796,7 +885,7 @@ class OrdersFeedTab extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  status,
+                  settled ? 'DELIVERED & SETTLED' : order.status.toUpperCase(),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 9,
@@ -808,7 +897,7 @@ class OrdersFeedTab extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '$time • $payment',
+            '${_formatDate(order.createdAt)} • ${order.paymentMethod ?? 'PayChangu'}',
             style: TextStyle(
               color: Colors.grey.shade600,
               fontSize: 12,
@@ -823,10 +912,16 @@ class OrdersFeedTab extends StatelessWidget {
               color: Colors.grey,
             ),
           ),
-          ...items.map((item) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Text(item, style: const TextStyle(fontSize: 13)),
-          )),
+          if (items.isNotEmpty)
+            ...items.map((item) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Text(
+                '${item.quantity}x ${item.name}',
+                style: const TextStyle(fontSize: 13),
+              ),
+            ))
+          else
+            const Text('No items', style: TextStyle(fontSize: 13)),
           const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -836,7 +931,7 @@ class OrdersFeedTab extends StatelessWidget {
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               Text(
-                total,
+                Formatters.currencyFormat(total),
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
@@ -863,9 +958,18 @@ class OrdersFeedTab extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(location),
-                Text(landmark, style: const TextStyle(fontSize: 12)),
-                Text('Phone: $phone', style: const TextStyle(fontSize: 12)),
+                Text(deliveryAddress),
+                if (order.driverName != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Driver: ${order.driverName}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  Text(
+                    'Phone: ${order.driverPhone ?? 'N/A'}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
                 if (settled)
                   const Padding(
                     padding: EdgeInsets.only(top: 8),
@@ -885,6 +989,10 @@ class OrdersFeedTab extends StatelessWidget {
       ),
     );
   }
+
+  String _formatDate(DateTime date) {
+    return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
 }
 
 // ==================== SHOP PROFILE TAB ====================
@@ -897,12 +1005,35 @@ class ShopProfileTab extends StatefulWidget {
 
 class _ShopProfileTabState extends State<ShopProfileTab> {
   final _formKey = GlobalKey<FormState>();
-  final _storeNameController = TextEditingController(text: 'Chambo & Nsima Hub');
-  final _phoneController = TextEditingController(text: '888 222 111');
-  final _stallIdController = TextEditingController(text: 'Stall 14, Area 18 Complex');
-  final _districtController = TextEditingController(text: 'Lilongwe');
-  final _wardController = TextEditingController(text: 'Area 18');
-  final _sloganController = TextEditingController(text: 'Abida Chambo Star');
+  late TextEditingController _storeNameController;
+  late TextEditingController _phoneController;
+  late TextEditingController _addressController;
+  late TextEditingController _districtController;
+  late TextEditingController _wardController;
+  late TextEditingController _sloganController;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = Provider.of<AuthProvider>(context, listen: false).user;
+    _storeNameController = TextEditingController(text: user?.storeName ?? '');
+    _phoneController = TextEditingController(text: user?.phoneNumber ?? '');
+    _addressController = TextEditingController(text: user?.location ?? '');
+    _districtController = TextEditingController(text: 'Lilongwe');
+    _wardController = TextEditingController(text: 'Area 18');
+    _sloganController = TextEditingController(text: '');
+  }
+
+  @override
+  void dispose() {
+    _storeNameController.dispose();
+    _phoneController.dispose();
+    _addressController.dispose();
+    _districtController.dispose();
+    _wardController.dispose();
+    _sloganController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -959,7 +1090,7 @@ class _ShopProfileTabState extends State<ShopProfileTab> {
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
-                    controller: _stallIdController,
+                    controller: _addressController,
                     decoration: const InputDecoration(
                       labelText: 'STALL ID / NO',
                       border: OutlineInputBorder(),
