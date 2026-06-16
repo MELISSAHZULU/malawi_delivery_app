@@ -23,9 +23,16 @@ class RegisterView(generics.CreateAPIView):
                 'refresh': str(refresh),
                 'message': f'Account created successfully as {user.role}'
             }, status=status.HTTP_201_CREATED)
+        
+        # Format errors as a simple string
+        error_messages = []
+        for field, errors in serializer.errors.items():
+            for error in errors:
+                error_messages.append(f"{field}: {error}")
+        
         return Response({
             'success': False,
-            'error': serializer.errors
+            'error': ', '.join(error_messages) if error_messages else 'Registration failed'
         }, status=status.HTTP_400_BAD_REQUEST)
 
 class LoginView(TokenObtainPairView):
@@ -37,6 +44,7 @@ class LoginView(TokenObtainPairView):
         
         if not username or not password:
             return Response({
+                'success': False,
                 'error': 'Username and password are required'
             }, status=status.HTTP_400_BAD_REQUEST)
         
@@ -44,11 +52,13 @@ class LoginView(TokenObtainPairView):
         
         if user is None:
             return Response({
+                'success': False,
                 'error': 'Invalid credentials'
             }, status=status.HTTP_401_UNAUTHORIZED)
         
         if not user.is_active:
             return Response({
+                'success': False,
                 'error': 'Account is disabled'
             }, status=status.HTTP_403_FORBIDDEN)
         

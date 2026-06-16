@@ -22,6 +22,8 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final response = await _apiService.login(username, password);
+      print('Login response: $response');
+      
       if (response['success'] == true) {
         _user = User.fromJson(response['user']);
         _token = response['access'];
@@ -49,6 +51,8 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final response = await _apiService.register(userData);
+      print('Register response: $response');
+      
       if (response['success'] == true) {
         _user = User.fromJson(response['user']);
         _token = response['access'];

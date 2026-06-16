@@ -94,6 +94,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     labelText: 'Email',
                     prefixIcon: Icon(Icons.email_outlined),
                   ),
+                  keyboardType: TextInputType.emailAddress,
                   validator: (value) => Validators.validateEmail(value),
                 ),
                 const SizedBox(height: 16),
@@ -216,17 +217,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         : () async {
                             if (_formKey.currentState!.validate()) {
                               final userData = {
-                                'username': _usernameController.text,
-                                'email': _emailController.text,
+                                'username': _usernameController.text.trim(),
+                                'email': _emailController.text.trim(),
                                 'password': _passwordController.text,
+                                'password2': _confirmPasswordController.text, // Make sure this is sent!
                                 'role': _selectedRole,
-                                'phone_number': _phoneController.text,
-                                'store_name': _storeNameController.text,
-                                'address': _addressController.text,
+                                'phone_number': _phoneController.text.trim(),
+                                'store_name': _storeNameController.text.trim(),
+                                'address': _addressController.text.trim(),
                               };
+                              
+                              // Print what we're sending for debugging
+                              print('Registering user: $userData');
+                              
                               final success = await authProvider.register(userData);
                               if (success && mounted) {
-                                // Navigate based on role
                                 final user = authProvider.user;
                                 if (user != null) {
                                   String route;

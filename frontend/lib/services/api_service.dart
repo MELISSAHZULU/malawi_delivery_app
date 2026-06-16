@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../utils/constants.dart';
-import '../models/user.dart';
 
 class ApiService {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
@@ -37,9 +36,20 @@ class ApiService {
           'refresh': data['refresh'],
         };
       } else {
+        // Extract error message properly
+        String errorMsg = 'Login failed';
+        if (data['error'] is String) {
+          errorMsg = data['error'];
+        } else if (data['error'] is Map) {
+          errorMsg = data['error'].values.join(', ');
+        } else if (data['detail'] is String) {
+          errorMsg = data['detail'];
+        } else if (data['message'] is String) {
+          errorMsg = data['message'];
+        }
         return {
           'success': false,
-          'error': data['error'] ?? data['detail'] ?? 'Login failed',
+          'error': errorMsg,
         };
       }
     } catch (e) {
@@ -76,9 +86,20 @@ class ApiService {
           'refresh': data['refresh'] ?? '',
         };
       } else {
+        // Extract error message properly
+        String errorMsg = 'Registration failed';
+        if (data['error'] is String) {
+          errorMsg = data['error'];
+        } else if (data['error'] is Map) {
+          errorMsg = data['error'].values.join(', ');
+        } else if (data['detail'] is String) {
+          errorMsg = data['detail'];
+        } else if (data['message'] is String) {
+          errorMsg = data['message'];
+        }
         return {
           'success': false,
-          'error': data['error'] ?? data['detail'] ?? 'Registration failed',
+          'error': errorMsg,
         };
       }
     } catch (e) {
