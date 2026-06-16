@@ -1,20 +1,33 @@
-# orders/views.py
-
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from .models import Order, OrderTracking
-from .serializers import OrderSerializer, OrderTrackingSerializer
+from .serializers import OrderSerializer, OrderCreateSerializer
 from payments.services import PayChanguService
 
 class CreateOrderView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
-    serializer_class = OrderSerializer
+    serializer_class = OrderCreateSerializer
     
     def perform_create(self, serializer):
-        order = serializer.save(buyer=self.request.user.buyer_profile)
+        buyer = self.request.user.buyer_profile
+        
+        # Calculate totals
+        items = self.request.data.get('items', [])
+        subtotal = sum(item.get('price', 0) * item.get('quantity', 1) for item in items)
+        seller_id = self.request.data.get('seller')
+        seller = SellerProfile.objects.get(id=seller_id)
+        delivery_fee = seller.delivery_fee
+        
+        order = serializer.save(
+            buyer=buyer,
+            subtotal=subtotal,
+            delivery_fee=delivery_fee,
+            total=subtotal + delivery_fee
+        )
+        
         # Create initial tracking
         OrderTracking.objects.create(
             order=order,
@@ -22,41 +35,44 @@ class CreateOrderView(generics.CreateAPIView):
             note='Order placed successfully'
         )
         
-        # Initiate payment with PayChangu
-        paychangu = PayChanguService()
-        payment_url = paychangu.initiate_payment(
-            order=order,
-            mobile_number=self.request.data.get('mobile_number'),
-            operator=self.request.data.get('operator')
-        )
-        
-        return order, payment_url
+        return order
     
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        order, payment_url = self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
+        order = self.perform_create(serializer)
+        
+        # Initiate payment
+        paychangu = PayChanguService()
+        payment_result = paychangu.initiate_payment(
+            order=order,
+            mobile_number=request.data.get('mobile_number'),
+            operator=request.data.get('operator')
+        )
+        
         return Response({
             'order': OrderSerializer(order).data,
-            'payment_url': payment_url
-        }, status=status.HTTP_201_CREATED, headers=headers)
+            'payment': payment_result
+        }, status=status.HTTP_201_CREATED)
 
-class OrderTrackView(generics.RetrieveAPIView):
+class OrderListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = OrderSerializer
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'buyer':
+            return Order.objects.filter(buyer__user=user)
+        elif user.role == 'seller':
+            return Order.objects.filter(seller__user=user)
+        elif user.role == 'driver':
+            return Order.objects.filter(driver__user=user)
+        return Order.objects.none()
+
+class OrderDetailView(generics.RetrieveAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
-    
-    def get(self, request, *args, **kwargs):
-        order = self.get_object()
-        # Check if user has permission (buyer, seller, or driver)
-        user = request.user
-        if (user.role == 'buyer' and order.buyer.user != user) or \
-           (user.role == 'seller' and order.seller.user != user) or \
-           (user.role == 'driver' and order.driver.user != user):
-            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
-        
-        return super().get(request, *args, **kwargs)
 
 class UpdateOrderStatusView(generics.UpdateAPIView):
     permission_classes = [IsAuthenticated]
@@ -79,10 +95,10 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
         }
         
         if new_status not in allowed_transitions.get(order.status, []):
-            return Response({'error': f'Invalid status transition from {order.status} to {new_status}'},
-                          status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                'error': f'Invalid status transition from {order.status} to {new_status}'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Update order
         order.status = new_status
         order.save()
         
@@ -94,7 +110,7 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
             note=request.data.get('note', '')
         )
         
-        # Send real-time update via WebSocket
+        # Send WebSocket update
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
             f'order_{order.id}',
@@ -112,3 +128,17 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
             'order': OrderSerializer(order).data,
             'message': f'Order status updated to {new_status}'
         })
+
+class CancelOrderView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, order_id):
+        try:
+            order = Order.objects.get(id=order_id, buyer__user=request.user)
+            if order.status in ['pending', 'confirmed', 'preparing']:
+                order.status = 'cancelled'
+                order.save()
+                return Response({'message': 'Order cancelled successfully'})
+            return Response({'error': 'Order cannot be cancelled'}, status=status.HTTP_400_BAD_REQUEST)
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)

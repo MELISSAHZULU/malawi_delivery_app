@@ -10,10 +10,10 @@ dependencies:
     sdk: flutter
 
   # Core
-  provider: ^6.1.1
-  dio: ^5.4.0
+  provider: ^6.0.5
+  dio: ^5.3.3
   shared_preferences: ^2.2.2
-  flutter_secure_storage: ^9.2.2
+  flutter_secure_storage: ^9.0.0
 
   # Database & Offline
   hive: ^2.2.3
@@ -21,52 +21,46 @@ dependencies:
   connectivity_plus: ^5.0.1
 
   # Maps & Location
-  geolocator: ^10.1.0
-  google_maps_flutter: ^2.6.1
+  geolocator: ^10.0.1
+  google_maps_flutter: ^2.5.0
 
   # Real-time
   web_socket_channel: ^2.4.0
 
   # UI
-  cached_network_image: ^3.3.1
-  flutter_svg: ^2.0.10+1
+  cached_network_image: ^3.3.0
+  flutter_svg: ^2.0.9
   flutter_rating_bar: ^4.0.1
   intl: ^0.18.1
   pull_to_refresh: ^2.0.0
   shimmer: ^3.0.0
 
   # Payments
-  webview_flutter: ^4.7.0
+  webview_flutter: ^4.5.0
 
-  # Navigation
-  go_router: ^13.2.0
-
-  # Image Picker
-  image_picker: ^1.0.7
-
-  # Device Info
-  device_info_plus: ^9.1.0
+  # HTTP
+  http: ^1.1.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  hive_generator: ^2.0.1
+  build_runner: ^2.4.7
 
 flutter:
   uses-material-design: true
   
-  # Assets - Uncomment when you add real assets
-  # assets:
-  #   - assets/images/
-  #   - assets/icons/
-  #   - assets/fonts/
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/fonts/
   
-  # Fonts - Uncomment when you add real fonts
-  # fonts:
-  #   - family: Inter
-  #     fonts:
-  #       - asset: assets/fonts/Inter-Regular.ttf
-  #       - asset: assets/fonts/Inter-Medium.ttf
-  #         weight: 500
-  #       - asset: assets/fonts/Inter-Bold.ttf
-  #         weight: 700
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700

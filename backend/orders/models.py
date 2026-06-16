@@ -1,8 +1,5 @@
-f# orders/models.py
-
 from django.db import models
-from accounts.models import User, BuyerProfile, SellerProfile, DriverProfile
-from marketplace.models import Product
+from accounts.models import BuyerProfile, SellerProfile, DriverProfile
 
 class Order(models.Model):
     STATUS_CHOICES = (
@@ -24,7 +21,7 @@ class Order(models.Model):
     order_number = models.CharField(max_length=20, unique=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     
-    items = models.JSONField()  # List of {product_id, name, quantity, price, total}
+    items = models.JSONField()
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
     delivery_fee = models.DecimalField(max_digits=10, decimal_places=2)
     total = models.DecimalField(max_digits=10, decimal_places=2)
@@ -37,29 +34,30 @@ class Order(models.Model):
     payment_status = models.CharField(max_length=20, default='pending')
     payment_transaction_id = models.CharField(max_length=100, null=True, blank=True)
     
-    tracking_updates = models.JSONField(default=list)  # List of {status, timestamp, location}
-    
+    tracking_updates = models.JSONField(default=list)
     estimated_delivery_time = models.DateTimeField(null=True, blank=True)
     actual_delivery_time = models.DateTimeField(null=True, blank=True)
     
+    is_offline = models.BooleanField(default=False)
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
-    def __str__(self):
-        return f"Order #{self.order_number} - {self.buyer.user.username}"
-    
+
     def save(self, *args, **kwargs):
         if not self.order_number:
             import random
-            self.order_number = f"MW{str(random.randint(1000, 9999))}{str(random.randint(100, 999))}"
+            self.order_number = f"MW{random.randint(1000, 9999)}{random.randint(100, 999)}"
         super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Order #{self.order_number}"
 
 class OrderTracking(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='tracking')
     status = models.CharField(max_length=20, choices=Order.STATUS_CHOICES)
-    location = models.JSONField(default=dict)  # {"lat": 0, "lng": 0}
+    location = models.JSONField(default=dict)
     note = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     def __str__(self):
-        return f"{self.order.order_number} - {self.status} at {self.created_at}"
+        return f"{self.order.order_number} - {self.status}"
