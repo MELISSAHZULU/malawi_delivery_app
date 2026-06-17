@@ -1,8 +1,10 @@
 from rest_framework import generics, status, views
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.db import models
 from datetime import timedelta
 from .models import Order, OrderTracking
 from .serializers import OrderSerializer, OrderCreateSerializer, OrderTrackingSerializer
@@ -18,34 +20,58 @@ class OrderListView(generics.ListCreateAPIView):
     
     def get_queryset(self):
         user = self.request.user
-        if user.role == 'buyer':
-            return Order.objects.filter(buyer__user=user).order_by('-created_at')
-        elif user.role == 'seller':
-            return Order.objects.filter(seller__user=user).order_by('-created_at')
-        elif user.role == 'driver':
-            return Order.objects.filter(driver=user).order_by('-created_at')
-        return Order.objects.none()
-    
-    def perform_create(self, serializer):
-        buyer = BuyerProfile.objects.get(user=self.request.user)
-        # Get seller from the first item
-        # For now, use a default seller or get from request
-        seller_id = self.request.data.get('seller_id')
-        if seller_id:
-            seller = SellerProfile.objects.get(id=seller_id)
-        else:
-            # Default seller (you should handle this properly)
-            seller = SellerProfile.objects.first()
+        print(f"User: {user.username}, Role: {user.role}")
         
-        serializer.save(
-            buyer=buyer,
-            seller=seller,
-            order_number=f"MW-{timezone.now().strftime('%Y%m%d')}-{Order.objects.count() + 1}"
-        )
+        if user.role == 'buyer':
+            queryset = Order.objects.filter(buyer__user=user).order_by('-created_at')
+        elif user.role == 'seller':
+            queryset = Order.objects.filter(seller__user=user).order_by('-created_at')
+        elif user.role == 'driver':
+            queryset = Order.objects.filter(driver=user).order_by('-created_at')
+        else:
+            queryset = Order.objects.none()
+        
+        print(f"Found {queryset.count()} orders")
+        return queryset
+    
+    def create(self, request, *args, **kwargs):
+        try:
+            buyer = BuyerProfile.objects.get(user=request.user)
+        except BuyerProfile.DoesNotExist:
+            return Response(
+                {'error': 'Buyer profile not found'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        seller_id = request.data.get('seller_id')
+        if seller_id:
+            try:
+                seller = SellerProfile.objects.get(id=seller_id)
+            except SellerProfile.DoesNotExist:
+                return Response(
+                    {'error': 'Seller not found'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            seller = SellerProfile.objects.first()
+            if not seller:
+                return Response(
+                    {'error': 'No seller available'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            order = serializer.save(
+                buyer=buyer,
+                seller=seller,
+                order_number=f"MWD-{timezone.now().strftime('%Y%m%d')}{Order.objects.count() + 1}"
+            )
+            return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class OrderDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
-    queryset = Order.objects.all()
     serializer_class = OrderSerializer
     
     def get_queryset(self):
@@ -83,6 +109,19 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Check if user has permission (seller or driver)
+        user = request.user
+        if user.role == 'seller' and order.seller.user != user:
+            return Response(
+                {'error': 'Not authorized to update this order'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        elif user.role == 'driver' and order.driver != user:
+            return Response(
+                {'error': 'Not authorized to update this order'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         # Update order status
         order.status = new_status
         order.save()
@@ -96,3 +135,52 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
         )
         
         return Response(OrderSerializer(order).data)
+
+class WeeklyEarningsView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        user = request.user
+        if user.role != 'seller':
+            return Response(
+                {'error': 'Only sellers can view earnings'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get last 7 days
+        end_date = timezone.now()
+        start_date = end_date - timedelta(days=7)
+        
+        # Get completed orders for this seller
+        orders = Order.objects.filter(
+            seller__user=user,
+            status='delivered',
+            created_at__gte=start_date,
+            created_at__lte=end_date
+        )
+        
+        # Calculate daily earnings
+        daily_earnings = {}
+        weekdays = []
+        for i in range(7):
+            day = start_date + timedelta(days=i)
+            day_orders = orders.filter(created_at__date=day.date())
+            day_total = day_orders.aggregate(total=models.Sum('total'))['total'] or 0
+            daily_earnings[day.strftime('%a')] = float(day_total)
+            weekdays.append(day.strftime('%a'))
+        
+        # Calculate total earnings
+        total_earnings = sum(daily_earnings.values())
+        
+        # Get wallet balance
+        wallet_balance = 0
+        if hasattr(user, 'seller_profile') and hasattr(user.seller_profile, 'wallet'):
+            wallet_balance = float(user.seller_profile.wallet.balance)
+        
+        return Response({
+            'weekly_earnings': daily_earnings,
+            'total': total_earnings,
+            'wallet_balance': wallet_balance,
+            'weekdays': weekdays,
+            'orders_count': orders.count()
+        })

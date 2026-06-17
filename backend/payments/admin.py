@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import PaymentTransaction
+from .models import PaymentTransaction, SellerWallet
 
 @admin.register(PaymentTransaction)
 class PaymentTransactionAdmin(admin.ModelAdmin):
@@ -8,22 +8,9 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
     search_fields = ('transaction_id', 'paychangu_reference', 'mobile_number', 'order__order_number')
     readonly_fields = ('transaction_id', 'created_at')
     list_editable = ('status',)
-    
-    fieldsets = (
-        ('Transaction Details', {
-            'fields': ('transaction_id', 'order', 'amount', 'currency')
-        }),
-        ('PayChangu Info', {
-            'fields': ('paychangu_reference', 'paychangu_status')
-        }),
-        ('Customer Info', {
-            'fields': ('mobile_number', 'operator')
-        }),
-        ('Status', {
-            'fields': ('status', 'completed_at')
-        }),
-        ('Data', {
-            'fields': ('callback_data',),
-            'classes': ('collapse',)
-        }),
-    )
+
+@admin.register(SellerWallet)
+class SellerWalletAdmin(admin.ModelAdmin):
+    list_display = ('seller', 'balance', 'total_earned', 'total_withdrawn', 'updated_at')
+    search_fields = ('seller__store_name', 'seller__user__username')
+    readonly_fields = ('updated_at',)

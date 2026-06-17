@@ -18,6 +18,42 @@ class UserSerializer(serializers.ModelSerializer):
             return obj.seller_profile.store_name
         return None
 
+class SellerProfileSerializer(serializers.ModelSerializer):
+    store_name = serializers.CharField(source='store_name', read_only=False)
+    phone_number = serializers.CharField(source='user.phone_number', read_only=False)
+    address = serializers.CharField(source='address', read_only=False)
+    location = serializers.CharField(source='user.location', read_only=False)
+    
+    class Meta:
+        model = SellerProfile
+        fields = [
+            'store_name', 'store_description', 'store_logo', 'store_banner',
+            'address', 'latitude', 'longitude', 'is_active', 'opening_hours',
+            'delivery_fee', 'phone_number', 'location'
+        ]
+    
+    def update(self, instance, validated_data):
+        # Handle nested user fields
+        user_data = {}
+        if 'phone_number' in validated_data:
+            user_data['phone_number'] = validated_data.pop('phone_number')
+        if 'location' in validated_data:
+            user_data['location'] = validated_data.pop('location')
+        
+        # Update seller profile
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        # Update user
+        if user_data:
+            user = instance.user
+            for attr, value in user_data.items():
+                setattr(user, attr, value)
+            user.save()
+        
+        return instance
+
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)
     password2 = serializers.CharField(write_only=True, required=True)
@@ -32,21 +68,17 @@ class RegisterSerializer(serializers.ModelSerializer):
         if attrs['password'] != attrs['password2']:
             raise serializers.ValidationError({"password": "Password fields didn't match."})
         
-        # Validate password strength
         try:
             validate_password(attrs['password'])
         except ValidationError as e:
             raise serializers.ValidationError({"password": e.messages})
         
-        # Check if username already exists
         if User.objects.filter(username=attrs['username']).exists():
             raise serializers.ValidationError({"username": "Username already exists."})
         
-        # Check if email already exists
         if User.objects.filter(email=attrs['email']).exists():
             raise serializers.ValidationError({"email": "Email already exists."})
         
-        # Check if phone number already exists
         if attrs.get('phone_number') and User.objects.filter(phone_number=attrs['phone_number']).exists():
             raise serializers.ValidationError({"phone_number": "Phone number already exists."})
         
@@ -59,17 +91,19 @@ class RegisterSerializer(serializers.ModelSerializer):
         
         user = User.objects.create_user(**validated_data)
         
-        # Create role-specific profile
         if user.role == 'buyer':
             BuyerProfile.objects.create(user=user)
         elif user.role == 'seller':
-            SellerProfile.objects.create(
+            seller = SellerProfile.objects.create(
                 user=user,
                 store_name=store_name or f"{user.username}'s Store",
                 address=address or '',
                 latitude=0,
                 longitude=0
             )
+            # Create wallet for seller
+            from payments.models import SellerWallet
+            SellerWallet.objects.create(seller=seller)
         elif user.role == 'driver':
             DriverProfile.objects.create(
                 user=user,

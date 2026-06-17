@@ -5,7 +5,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
-from .serializers import RegisterSerializer, UserSerializer, ProfileSerializer
+from .serializers import RegisterSerializer, UserSerializer, ProfileSerializer, SellerProfileSerializer
 from .models import User, SellerProfile
 
 User = get_user_model()
@@ -27,7 +27,6 @@ class RegisterView(generics.CreateAPIView):
                 'message': f'Account created successfully as {user.role}'
             }, status=status.HTTP_201_CREATED)
         
-        # Format errors as a simple string
         error_messages = []
         for field, errors in serializer.errors.items():
             for error in errors:
@@ -56,7 +55,6 @@ class LoginView(TokenObtainPairView):
                 'error': 'Username and password are required'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Check if user exists
         try:
             user = User.objects.get(username=username)
             print(f"User found: {user.username}, Role: {user.role}, Active: {user.is_active}")
@@ -67,7 +65,6 @@ class LoginView(TokenObtainPairView):
                 'error': 'Invalid credentials'
             }, status=status.HTTP_401_UNAUTHORIZED)
         
-        # Authenticate user
         user = authenticate(username=username, password=password)
         
         if user is None:
@@ -83,13 +80,9 @@ class LoginView(TokenObtainPairView):
                 'error': 'Account is disabled'
             }, status=status.HTTP_403_FORBIDDEN)
         
-        # Generate tokens
         refresh = RefreshToken.for_user(user)
         
-        # Get user data with role-specific info
         user_data = UserSerializer(user).data
-        
-        # Add store name for sellers
         if user.role == 'seller' and hasattr(user, 'seller_profile'):
             user_data['store_name'] = user.seller_profile.store_name
         
@@ -109,3 +102,23 @@ class ProfileView(generics.RetrieveUpdateAPIView):
     
     def get_object(self):
         return self.request.user
+
+class UpdateStoreView(generics.UpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = SellerProfileSerializer
+    
+    def get_object(self):
+        return self.request.user.seller_profile
+    
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        return Response({
+            'success': True,
+            'data': serializer.data,
+            'message': 'Store updated successfully'
+        })
