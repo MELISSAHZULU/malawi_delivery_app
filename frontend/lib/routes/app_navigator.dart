@@ -4,23 +4,18 @@ import '../screens/auth/splash_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/buyer/home_screen.dart';
-import '../screens/buyer/product_detail_screen.dart';
 import '../screens/buyer/cart_screen.dart';
 import '../screens/buyer/checkout_screen.dart';
 import '../screens/buyer/order_tracking_screen.dart';
+import '../screens/buyer/order_history_screen.dart';
+import '../screens/buyer/buyer_profile_screen.dart';
 import '../screens/seller/seller_home_screen.dart';
-import '../screens/seller/seller_dashboard_screen.dart';
-import '../screens/seller/add_product_screen.dart';
-import '../screens/seller/manage_products_screen.dart';
-import '../screens/seller/store_settings_screen.dart';
-import '../screens/seller/sales_analytics_screen.dart';
 import '../screens/driver/driver_dashboard.dart';
-import '../screens/shared/profile_screen.dart';
-import '../screens/shared/order_history_screen.dart';
-import '../screens/shared/saved_addresses_screen.dart';
-import '../screens/shared/payment_methods_screen.dart';
 import '../screens/shared/notifications_screen.dart';
 import '../screens/shared/help_support_screen.dart';
+import '../screens/shared/saved_addresses_screen.dart';
+import '../screens/shared/payment_methods_screen.dart';
+import '../screens/seller/add_product_screen.dart';
 
 class AppNavigator {
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -51,26 +46,29 @@ class AppNavigator {
         return MaterialPageRoute(
           builder: (_) => OrderTrackingScreen(orderId: orderId),
         );
-      case AppRoutes.profile:
-        return MaterialPageRoute(builder: (_) => const ProfileScreen());
       case AppRoutes.orderHistory:
         return MaterialPageRoute(builder: (_) => const OrderHistoryScreen());
-      case AppRoutes.savedAddresses:
-        return MaterialPageRoute(builder: (_) => const SavedAddressesScreen());
-      case AppRoutes.paymentMethods:
-        return MaterialPageRoute(builder: (_) => const PaymentMethodsScreen());
+      case AppRoutes.buyerProfile:
+        return MaterialPageRoute(builder: (_) => const BuyerProfileScreen());
+      case AppRoutes.profile:
+        // Check if user is buyer, seller, or driver
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        if (authProvider.user?.isSeller == true) {
+          return MaterialPageRoute(builder: (_) => const SellerHomeScreen());
+        } else if (authProvider.user?.isDriver == true) {
+          return MaterialPageRoute(builder: (_) => const DriverProfileScreen());
+        }
+        return MaterialPageRoute(builder: (_) => const BuyerProfileScreen());
       case AppRoutes.notifications:
         return MaterialPageRoute(builder: (_) => const NotificationsScreen());
       case AppRoutes.helpSupport:
         return MaterialPageRoute(builder: (_) => const HelpSupportScreen());
+      case AppRoutes.savedAddresses:
+        return MaterialPageRoute(builder: (_) => const SavedAddressesScreen());
+      case AppRoutes.paymentMethods:
+        return MaterialPageRoute(builder: (_) => const PaymentMethodsScreen());
       case AppRoutes.addProduct:
         return MaterialPageRoute(builder: (_) => const AddProductScreen());
-      case AppRoutes.manageProducts:
-        return MaterialPageRoute(builder: (_) => const ManageProductsScreen());
-      case AppRoutes.storeSettings:
-        return MaterialPageRoute(builder: (_) => const StoreSettingsScreen());
-      case AppRoutes.salesAnalytics:
-        return MaterialPageRoute(builder: (_) => const SalesAnalyticsScreen());
       default:
         return MaterialPageRoute(
           builder: (_) => const Scaffold(

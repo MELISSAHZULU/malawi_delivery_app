@@ -8,11 +8,15 @@ class AppRoutes {
   static const String sellerHome = '/seller-home';
   static const String driverHome = '/driver-home';
   
-  // Shared screens
-  static const String productDetail = '/product-detail';
+  // Buyer screens
   static const String cart = '/cart';
   static const String checkout = '/checkout';
   static const String tracking = '/tracking';
+  static const String orderHistory = '/order-history';
+  static const String buyerProfile = '/buyer-profile';
+  
+  // Shared screens
+  static const String productDetail = '/product-detail';
   static const String profile = '/profile';
   static const String orders = '/orders';
   static const String addProduct = '/add-product';
@@ -22,7 +26,6 @@ class AppRoutes {
   static const String deliveryDetail = '/delivery-detail';
   
   // Profile sub-screens
-  static const String orderHistory = '/order-history';
   static const String savedAddresses = '/saved-addresses';
   static const String paymentMethods = '/payment-methods';
   static const String notifications = '/notifications';

@@ -13,42 +13,48 @@ class CartScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Shopping Basket'),
+        title: const Text('Your Cart'),
         backgroundColor: Colors.transparent,
         foregroundColor: const Color(0xFF0A1A2B),
         elevation: 0,
-        actions: [
-          if (cartProvider.itemCount > 0)
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              onPressed: cartProvider.clearCart,
-            ),
-        ],
       ),
       body: cartProvider.itemCount == 0
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.shopping_cart_outlined, size: 80, color: Colors.grey.shade400),
+                  Icon(
+                    Icons.shopping_cart_outlined,
+                    size: 80,
+                    color: Colors.grey.shade400,
+                  ),
                   const SizedBox(height: 16),
                   Text(
-                    'Your basket is empty',
+                    'Your cart is empty',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade600,
+                      color: Colors.grey.shade700,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Start shopping to add items',
-                    style: TextStyle(color: Colors.grey.shade500),
+                    'Add some delicious items and come back here!',
+                    style: TextStyle(
+                      color: Colors.grey.shade500,
+                    ),
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Continue Shopping'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0A1A2B),
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Browse Items'),
                   ),
                 ],
               ),
@@ -58,8 +64,9 @@ class CartScreen extends StatelessWidget {
                 Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
-                    itemCount: cartProvider.itemCount,
+                    itemCount: cartProvider.items.length,
                     itemBuilder: (context, index) {
+                      final item = cartProvider.items[index];
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
@@ -72,19 +79,19 @@ class CartScreen extends StatelessWidget {
                             ),
                             child: const Icon(Icons.food_bank),
                           ),
-                          title: const Text('Nsima with Fried Lake Chambo'),
-                          subtitle: Text(Formatters.currencyFormat(4800)),
+                          title: Text(item.name),
+                          subtitle: Text(Formatters.currencyFormat(item.price)),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.remove),
-                                onPressed: () => cartProvider.removeItem(),
+                                icon: const Icon(Icons.remove, size: 20),
+                                onPressed: () => cartProvider.decrementQuantity(item.productId),
                               ),
-                              Text('${cartProvider.itemCount}'),
+                              Text('${item.quantity}'),
                               IconButton(
-                                icon: const Icon(Icons.add),
-                                onPressed: () => cartProvider.addItem(),
+                                icon: const Icon(Icons.add, size: 20),
+                                onPressed: () => cartProvider.incrementQuantity(item.productId),
                               ),
                             ],
                           ),
@@ -109,31 +116,18 @@ class CartScreen extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Basket Subtotal:'),
-                          Text(Formatters.currencyFormat(cartProvider.total)),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Moto Delivery Charge:'),
-                          Text(Formatters.currencyFormat(1500)),
-                        ],
-                      ),
-                      const Divider(),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
                           const Text(
-                            'Total MWK:',
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                            'Total',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           Text(
-                            Formatters.currencyFormat(cartProvider.total + 1500),
+                            Formatters.currencyFormat(cartProvider.total),
                             style: const TextStyle(
+                              fontSize: 20,
                               fontWeight: FontWeight.bold,
-                              fontSize: 18,
                               color: Color(0xFF0A1A2B),
                             ),
                           ),
@@ -142,15 +136,20 @@ class CartScreen extends StatelessWidget {
                       const SizedBox(height: 16),
                       SizedBox(
                         width: double.infinity,
-                        child: ElevatedButton.icon(
+                        child: ElevatedButton(
                           onPressed: () => Navigator.pushNamed(context, AppRoutes.checkout),
-                          icon: const Icon(Icons.security),
-                          label: const Text('Secure Checkout via PayChangu →'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF0A1A2B),
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'Proceed to Checkout',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
