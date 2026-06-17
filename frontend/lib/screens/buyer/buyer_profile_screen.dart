@@ -41,7 +41,7 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
             // Stats Row
             _buildStatsRow(),
             const SizedBox(height: 16),
-            // Menu Items
+            // Menu Items (Order History removed - now in bottom nav)
             _buildMenuItems(),
             const SizedBox(height: 16),
             // App version
