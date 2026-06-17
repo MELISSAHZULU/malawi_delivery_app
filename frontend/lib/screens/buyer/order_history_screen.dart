@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/order_provider.dart';
+import '../../models/order.dart';
 import '../../utils/formatters.dart';
 import '../../routes/app_routes.dart';
 
@@ -87,10 +88,11 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     );
   }
 
-  Widget _buildOrderCard(dynamic order) {
-    final status = order.status ?? 'pending';
+  Widget _buildOrderCard(Order order) {
+    final status = order.status;
     final isDelivered = status == 'delivered';
     final isCancelled = status == 'cancelled';
+    final statusColor = isDelivered ? Colors.green : (isCancelled ? Colors.red : Colors.orange);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -99,25 +101,23 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: isDelivered ? Colors.green : (isCancelled ? Colors.red : Colors.orange),
+            color: statusColor.withOpacity(0.2),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
             isDelivered ? Icons.check : (isCancelled ? Icons.close : Icons.pending),
-            color: Colors.white,
+            color: statusColor,
           ),
         ),
         title: Text(
-          order.orderNumber ?? 'Order',
+          order.orderNumber,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              order.createdAt != null
-                  ? Formatters.dateTimeFormat(order.createdAt)
-                  : 'Date unknown',
+              Formatters.dateTimeFormat(order.createdAt),
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.grey.shade600,
@@ -126,7 +126,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: isDelivered ? Colors.green : (isCancelled ? Colors.red : Colors.orange),
+                color: statusColor,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -144,7 +144,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              Formatters.currencyFormat(order.total ?? 0),
+              Formatters.currencyFormat(order.total),
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
@@ -162,12 +162,11 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // Seller name
                 if (order.sellerName != null)
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      order.sellerName,
+                      order.sellerName!,
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: Colors.grey.shade700,
@@ -175,8 +174,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                     ),
                   ),
                 const SizedBox(height: 8),
-                // Items
-                if (order.items != null && order.items.isNotEmpty)
+                if (order.items.isNotEmpty)
                   ...order.items.map((item) => Padding(
                     padding: const EdgeInsets.symmetric(vertical: 2),
                     child: Row(
@@ -193,7 +191,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                   children: [
                     const Text('Total'),
                     Text(
-                      Formatters.currencyFormat(order.total ?? 0),
+                      Formatters.currencyFormat(order.total),
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,

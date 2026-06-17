@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/order.dart';
+import '../models/cart_item.dart';
 import '../services/api_service.dart';
 
 class OrderProvider extends ChangeNotifier {
@@ -37,6 +38,7 @@ class OrderProvider extends ChangeNotifier {
           print('Orders loaded: ${_orders.length}');
         } else {
           _orders = [];
+          print('Data is not a list: $data');
         }
       } else {
         _error = response['error'] ?? 'Failed to fetch orders';
@@ -96,7 +98,7 @@ class OrderProvider extends ChangeNotifier {
     try {
       // First, try to find the order in the existing list
       final existingOrder = _orders.firstWhere(
-        (o) => o.id == orderId || o.orderNumber == orderId,
+        (o) => o.id == orderId,
         orElse: () => throw Exception('Order not found'),
       );
       _currentOrder = existingOrder;

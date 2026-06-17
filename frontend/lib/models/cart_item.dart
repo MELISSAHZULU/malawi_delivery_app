@@ -18,10 +18,22 @@ class CartItem {
   });
 
   factory CartItem.fromJson(Map<String, dynamic> json) {
+    // Parse price safely (handle string or double)
+    double parsePrice(dynamic price) {
+      if (price == null) return 0.0;
+      if (price is double) return price;
+      if (price is int) return price.toDouble();
+      if (price is String) {
+        final cleaned = price.replaceAll(RegExp(r'[^0-9.]'), '');
+        return double.tryParse(cleaned) ?? 0.0;
+      }
+      return 0.0;
+    }
+
     return CartItem(
       productId: json['product_id'] ?? 0,
       name: json['name'] ?? '',
-      price: (json['price'] ?? 0).toDouble(),
+      price: parsePrice(json['price']),
       quantity: json['quantity'] ?? 1,
       imageUrl: json['image_url'],
       sellerId: json['seller_id'] ?? 0,

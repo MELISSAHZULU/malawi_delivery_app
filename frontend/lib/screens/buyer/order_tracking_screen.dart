@@ -32,27 +32,19 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
     try {
       final orderProvider = Provider.of<OrderProvider>(context, listen: false);
-      
-      // Fetch all orders for the current user
       await orderProvider.fetchOrders();
-      print('Orders loaded: ${orderProvider.orders.length}');
       
       if (orderProvider.orders.isNotEmpty) {
-        // Use the first order
-        final firstOrder = orderProvider.orders.first;
-        await orderProvider.trackOrder(firstOrder.id);
-        print('Tracking order: ${firstOrder.orderNumber} (ID: ${firstOrder.id})');
-      } else {
-        setState(() {
-          _error = 'No orders found';
-          _isLoading = false;
-        });
+        // Get the most recent order
+        final latestOrder = orderProvider.orders.first;
+        // The order ID from the response is an integer, but we need to use the id field
+        await orderProvider.trackOrder(latestOrder.id.toString());
+        print('Tracking order: ${latestOrder.orderNumber} (ID: ${latestOrder.id})');
       }
     } catch (e) {
       print('Error loading orders: $e');
       setState(() {
-        _error = 'Failed to load orders: $e';
-        _isLoading = false;
+        _error = 'Failed to load orders';
       });
     } finally {
       if (mounted) {
@@ -82,42 +74,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       ),
       body: _isLoading || orderProvider.isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? _buildErrorState()
-              : order == null
-                  ? _buildEmptyState()
-                  : _buildTrackingContent(order, authProvider.user?.isSeller ?? false),
-    );
-  }
-
-  Widget _buildErrorState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline, size: 64, color: Colors.red.shade400),
-          const SizedBox(height: 16),
-          Text(
-            'Error loading order',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey.shade700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _error ?? 'Something went wrong',
-            style: TextStyle(color: Colors.grey.shade600),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: _loadOrders,
-            child: const Text('Retry'),
-          ),
-        ],
-      ),
+          : order == null
+              ? _buildEmptyState()
+              : _buildTrackingContent(order, authProvider.user?.isSeller ?? false),
     );
   }
 
@@ -160,7 +119,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Order ID
           Text(
             'Order: #${order.orderNumber}',
             style: const TextStyle(
@@ -178,7 +136,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Progress Bar
           LinearProgressIndicator(
             value: progress / 100,
             backgroundColor: Colors.grey.shade200,
@@ -193,7 +150,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Status Steps
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -213,52 +169,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Driver Info
-          if (order.driverName != null) ...[
-            const Text(
-              'DESPATCH DRIVER',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF4A6478),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 24,
-                      backgroundColor: Colors.grey.shade200,
-                      child: const Icon(Icons.person, color: Color(0xFF0A1A2B)),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            order.driverName!,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          const Text(
-                            'OPERATOR CONTACT',
-                            style: TextStyle(fontSize: 12, color: Color(0xFF4A6478)),
-                          ),
-                          Text(order.driverPhone ?? 'N/A'),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-
-          // Delivery Address
           const Text(
             'DELIVERY ADDRESS',
             style: TextStyle(
@@ -287,86 +197,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Chat (if order is active)
-          if (order.status != 'delivered' && order.status != 'cancelled') ...[
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.blue.shade200),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.message, color: Color(0xFF2A7DE1)),
-                      const SizedBox(width: 8),
-                      Text(
-                        'SECURE CHAT WITH ${order.driverName?.toUpperCase() ?? 'DRIVER'}',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            decoration: const InputDecoration(
-                              hintText: 'e.g. Please wrap the Nsima extra hot...',
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.send, color: Color(0xFF2A7DE1)),
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Chat feature coming soon!'),
-                                duration: Duration(seconds: 1),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-
-          // Complete Button (only for active orders)
-          if (order.status == 'arrived' || order.status == 'driving') ...[
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => _showRatingDialog(context, order),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1F8B4C),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text('Mark Delivery Complete • Leave 5-Star Rating'),
-              ),
-            ),
-          ],
-
-          // Order Items (for seller view)
-          if (isSeller && order.items.isNotEmpty) ...[
-            const SizedBox(height: 16),
+          if (order.items.isNotEmpty) ...[
             const Text(
               'ORDER ITEMS',
               style: TextStyle(
@@ -501,53 +332,5 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       default:
         return Colors.grey;
     }
-  }
-
-  void _showRatingDialog(BuildContext context, Order order) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Rate your delivery'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('How was your experience with ${order.driverName ?? 'the driver'}?'),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                5,
-                (index) => IconButton(
-                  icon: Icon(
-                    Icons.star_border,
-                    size: 32,
-                    color: Colors.amber,
-                  ),
-                  onPressed: () {},
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Thank you for rating! 🇲🇼 Zikomo!'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            },
-            child: const Text('Submit'),
-          ),
-        ],
-      ),
-    );
   }
 }

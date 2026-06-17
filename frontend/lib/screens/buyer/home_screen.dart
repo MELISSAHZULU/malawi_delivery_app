@@ -42,11 +42,8 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
-            _buildHeader(),
-            // Offline Banner
+            _buildHeader(cartProvider),
             OfflineBanner(queueCount: offlineProvider.queueLength),
-            // Main Content
             Expanded(
               child: RefreshIndicator(
                 onRefresh: _loadProducts,
@@ -56,22 +53,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Location & Greeting
                       _buildLocationGreeting(),
                       const SizedBox(height: 12),
-                      // Search Bar
                       _buildSearchBar(),
                       const SizedBox(height: 16),
-                      // Special Offer Banner
                       _buildSpecialOffer(),
                       const SizedBox(height: 16),
-                      // Categories
                       _buildCategories(),
                       const SizedBox(height: 16),
-                      // Featured Items
                       _buildFeaturedItems(productProvider, cartProvider),
                       const SizedBox(height: 16),
-                      // Products Grid
                       _buildProductsGrid(productProvider, cartProvider),
                       const SizedBox(height: 80),
                     ],
@@ -103,9 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
         onTap: (index) {
           setState(() => _currentIndex = index);
-          if (index == 0) {
-            // Already on home
-          } else if (index == 1) {
+          if (index == 1) {
             Navigator.pushNamed(context, AppRoutes.orderHistory);
           } else if (index == 2) {
             Navigator.pushNamed(context, AppRoutes.profile);
@@ -115,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(CartProvider cartProvider) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -146,37 +135,33 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: const Icon(Icons.notifications_outlined),
                 onPressed: () => Navigator.pushNamed(context, AppRoutes.notifications),
               ),
-              Consumer<CartProvider>(
-                builder: (context, cartProvider, _) {
-                  return Stack(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.shopping_cart_outlined),
-                        onPressed: () => Navigator.pushNamed(context, AppRoutes.cart),
-                      ),
-                      if (cartProvider.itemCount > 0)
-                        Positioned(
-                          right: 8,
-                          top: 8,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              '${cartProvider.itemCount}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+              Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.shopping_cart_outlined),
+                    onPressed: () => Navigator.pushNamed(context, AppRoutes.cart),
+                  ),
+                  if (cartProvider.itemCount > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '${cartProvider.itemCount}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                    ],
-                  );
-                },
+                      ),
+                    ),
+                ],
               ),
             ],
           ),
@@ -565,13 +550,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (productProvider.products.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(32.0),
+      return Padding(
+        padding: const EdgeInsets.all(32.0),
         child: Center(
           child: Column(
             children: [
               Icon(Icons.inventory_2, size: 48, color: Colors.grey.shade400),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Text(
                 'No products available',
                 style: TextStyle(

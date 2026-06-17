@@ -7,10 +7,8 @@ class CartProvider extends ChangeNotifier {
   List<CartItem> get items => _items;
   int get itemCount => _items.length;
   double get total => _items.fold(0, (sum, item) => sum + item.subtotal);
-  double get deliveryFee => 1500.0;
 
   void addItem({double price = 4800, String name = 'Nsima with Fried Lake Chambo'}) {
-    // Check if item already exists
     final existingIndex = _items.indexWhere((item) => item.name == name);
     if (existingIndex != -1) {
       _items[existingIndex] = _items[existingIndex].copyWith(
@@ -38,6 +36,30 @@ class CartProvider extends ChangeNotifier {
         );
       } else {
         _items.removeAt(existingIndex);
+      }
+      notifyListeners();
+    }
+  }
+
+  void incrementQuantity(int productId) {
+    final index = _items.indexWhere((item) => item.productId == productId);
+    if (index != -1) {
+      _items[index] = _items[index].copyWith(
+        quantity: _items[index].quantity + 1,
+      );
+      notifyListeners();
+    }
+  }
+
+  void decrementQuantity(int productId) {
+    final index = _items.indexWhere((item) => item.productId == productId);
+    if (index != -1) {
+      if (_items[index].quantity > 1) {
+        _items[index] = _items[index].copyWith(
+          quantity: _items[index].quantity - 1,
+        );
+      } else {
+        _items.removeAt(index);
       }
       notifyListeners();
     }

@@ -4,6 +4,7 @@ import '../screens/auth/splash_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/buyer/home_screen.dart';
+import '../screens/buyer/product_detail_screen.dart';
 import '../screens/buyer/cart_screen.dart';
 import '../screens/buyer/checkout_screen.dart';
 import '../screens/buyer/order_tracking_screen.dart';
@@ -11,6 +12,8 @@ import '../screens/buyer/order_history_screen.dart';
 import '../screens/buyer/buyer_profile_screen.dart';
 import '../screens/seller/seller_home_screen.dart';
 import '../screens/driver/driver_dashboard.dart';
+import '../screens/driver/driver_profile_screen.dart';
+import '../screens/driver/delivery_detail_screen.dart';
 import '../screens/shared/notifications_screen.dart';
 import '../screens/shared/help_support_screen.dart';
 import '../screens/shared/saved_addresses_screen.dart';
@@ -51,13 +54,7 @@ class AppNavigator {
       case AppRoutes.buyerProfile:
         return MaterialPageRoute(builder: (_) => const BuyerProfileScreen());
       case AppRoutes.profile:
-        // Check if user is buyer, seller, or driver
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
-        if (authProvider.user?.isSeller == true) {
-          return MaterialPageRoute(builder: (_) => const SellerHomeScreen());
-        } else if (authProvider.user?.isDriver == true) {
-          return MaterialPageRoute(builder: (_) => const DriverProfileScreen());
-        }
+        // Simple approach - use buyer profile for now
         return MaterialPageRoute(builder: (_) => const BuyerProfileScreen());
       case AppRoutes.notifications:
         return MaterialPageRoute(builder: (_) => const NotificationsScreen());
@@ -69,6 +66,10 @@ class AppNavigator {
         return MaterialPageRoute(builder: (_) => const PaymentMethodsScreen());
       case AppRoutes.addProduct:
         return MaterialPageRoute(builder: (_) => const AddProductScreen());
+      case AppRoutes.deliveryDetail:
+        return MaterialPageRoute(builder: (_) => const DeliveryDetailScreen());
+      case AppRoutes.driverProfile:
+        return MaterialPageRoute(builder: (_) => const DriverProfileScreen());
       default:
         return MaterialPageRoute(
           builder: (_) => const Scaffold(

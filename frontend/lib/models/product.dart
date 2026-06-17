@@ -38,11 +38,19 @@ class Product {
       if (price is double) return price;
       if (price is int) return price.toDouble();
       if (price is String) {
-        // Remove any currency symbols and parse
         final cleaned = price.replaceAll(RegExp(r'[^0-9.]'), '');
         return double.tryParse(cleaned) ?? 0.0;
       }
       return 0.0;
+    }
+
+    // Get image from images array if available
+    String? getImage(dynamic images) {
+      if (images == null) return null;
+      if (images is List && images.isNotEmpty) {
+        return images[0].toString();
+      }
+      return null;
     }
 
     return Product(
@@ -50,9 +58,7 @@ class Product {
       name: json['name'] ?? '',
       description: json['description'] ?? '',
       price: parsePrice(json['price']),
-      imageUrl: json['images'] != null && json['images'].isNotEmpty 
-          ? json['images'][0] 
-          : null,
+      imageUrl: getImage(json['images']),
       rating: (json['rating'] ?? 0).toDouble(),
       deliveryTime: '${json['preparation_time'] ?? 15}-${(json['preparation_time'] ?? 15) + 10} min',
       isPremium: json['is_premium'] ?? false,

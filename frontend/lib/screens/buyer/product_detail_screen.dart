@@ -1,54 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/cart_provider.dart';
+import '../../providers/product_provider.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/formatters.dart';
 
-class ProductDetailScreen extends StatelessWidget {
+class ProductDetailScreen extends StatefulWidget {
   final int productId;
 
   const ProductDetailScreen({Key? key, required this.productId}) : super(key: key);
 
   @override
+  State<ProductDetailScreen> createState() => _ProductDetailScreenState();
+}
+
+class _ProductDetailScreenState extends State<ProductDetailScreen> {
+  @override
   Widget build(BuildContext context) {
+    final productProvider = Provider.of<ProductProvider>(context);
     final cartProvider = Provider.of<CartProvider>(context);
+    final product = productProvider.getProductById(widget.productId);
+
+    if (product == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Product Not Found'),
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF0A1A2B),
+          elevation: 0,
+        ),
+        body: const Center(child: Text('Product not found')),
+      );
+    }
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
+        title: const Text('Product Details'),
         backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF0A1A2B),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.shopping_cart_outlined),
-                onPressed: () => Navigator.pushNamed(context, AppRoutes.cart),
-              ),
-              if (cartProvider.itemCount > 0)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      '${cartProvider.itemCount}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+          IconButton(
+            icon: const Icon(Icons.shopping_cart_outlined),
+            onPressed: () => Navigator.pushNamed(context, AppRoutes.cart),
           ),
         ],
       ),
@@ -57,104 +56,116 @@ class ProductDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image placeholder
             Container(
-              height: 250,
+              height: 200,
               width: double.infinity,
               decoration: BoxDecoration(
                 color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.food_bank, size: 80, color: Colors.grey),
+              child: const Icon(
+                Icons.food_bank,
+                size: 80,
+                color: Colors.grey,
+              ),
             ),
             const SizedBox(height: 16),
-            // Premium badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.blue,
-                borderRadius: BorderRadius.circular(4),
+            if (product.isPremium)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'PREMIUM',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-              child: const Text(
-                'Premium',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-            ),
             const SizedBox(height: 8),
             Text(
-              'Nsima with Fried Lake Chambo',
-              style: TextStyle(
+              product.name,
+              style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: const Color(0xFF0A1A2B),
+                color: Color(0xFF0A1A2B),
               ),
             ),
             const SizedBox(height: 8),
             Row(
               children: [
-                const Icon(Icons.star, color: Colors.amber),
-                const Text(' 4.8'),
-                const SizedBox(width: 16),
-                const Icon(Icons.access_time, size: 16),
-                const Text(' 20-30 min'),
-                const Spacer(),
+                const Icon(Icons.star, color: Colors.amber, size: 20),
                 Text(
-                  Formatters.currencyFormat(4800),
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0A1A2B),
+                  ' ${product.rating}',
+                  style: const TextStyle(fontSize: 16),
+                ),
+                const SizedBox(width: 16),
+                const Icon(Icons.access_time, color: Colors.grey, size: 20),
+                Text(
+                  ' ${product.deliveryTime}',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey.shade600,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            const Divider(),
-            const SizedBox(height: 16),
             Text(
+              Formatters.currencyFormat(product.price),
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0A1A2B),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
               'Description',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: const Color(0xFF0A1A2B),
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Fresh fried whole Chambo fish from Cape Maclear, served with two lumps of white corn nsima, tomato-onion gravy, and khwanya.',
+              product.description,
               style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 15,
+                fontSize: 16,
+                color: Colors.grey.shade700,
                 height: 1.5,
               ),
             ),
             const SizedBox(height: 24),
-            // Add to cart button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  cartProvider.addItem();
+                  cartProvider.addItem(price: product.price, name: product.name);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Added to cart!')),
+                    const SnackBar(
+                      content: Text('Added to cart!'),
+                      backgroundColor: Colors.green,
+                    ),
                   );
                 },
                 style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0A1A2B),
                   padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: const Text('Add to Cart - MWK 4,800', style: TextStyle(fontSize: 16)),
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => Navigator.pushNamed(context, AppRoutes.checkout),
-                icon: const Icon(Icons.security),
-                label: const Text('Buy Now with PayChangu', style: TextStyle(fontSize: 16)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2A7DE1),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                child: const Text(
+                  'Add to Cart',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),

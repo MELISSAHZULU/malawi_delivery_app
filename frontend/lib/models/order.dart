@@ -15,6 +15,8 @@ class Order {
   final DateTime? estimatedDeliveryTime;
   final String? paymentStatus;
   final String? paymentMethod;
+  final String? sellerName;
+  final String? buyerName;
 
   Order({
     required this.id,
@@ -31,20 +33,42 @@ class Order {
     this.estimatedDeliveryTime,
     this.paymentStatus,
     this.paymentMethod,
+    this.sellerName,
+    this.buyerName,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
+    // Parse items from the items list
+    List<CartItem> parseItems(dynamic itemsData) {
+      if (itemsData == null) return [];
+      if (itemsData is List) {
+        return itemsData.map((item) {
+          return CartItem.fromJson(item);
+        }).toList();
+      }
+      return [];
+    }
+
+    // Parse total safely
+    double parseTotal(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) {
+        final cleaned = value.replaceAll(RegExp(r'[^0-9.]'), '');
+        return double.tryParse(cleaned) ?? 0.0;
+      }
+      return 0.0;
+    }
+
     return Order(
-      id: json['id'] ?? '',
+      id: (json['id'] ?? '').toString(),
       orderNumber: json['order_number'] ?? '',
       status: json['status'] ?? 'pending',
-      items: (json['items'] as List?)
-              ?.map((item) => CartItem.fromJson(item as Map<String, dynamic>))
-              .toList() ??
-          [],
-      subtotal: (json['subtotal'] ?? 0).toDouble(),
-      deliveryFee: (json['delivery_fee'] ?? 0).toDouble(),
-      total: (json['total'] ?? 0).toDouble(),
+      items: parseItems(json['items']),
+      subtotal: parseTotal(json['subtotal']),
+      deliveryFee: parseTotal(json['delivery_fee']),
+      total: parseTotal(json['total']),
       deliveryAddress: json['delivery_address'] ?? '',
       driverName: json['driver_name'],
       driverPhone: json['driver_phone'],
@@ -54,6 +78,8 @@ class Order {
           : null,
       paymentStatus: json['payment_status'],
       paymentMethod: json['payment_method'],
+      sellerName: json['seller_name'],
+      buyerName: json['buyer_name'],
     );
   }
 
@@ -73,6 +99,8 @@ class Order {
       'estimated_delivery_time': estimatedDeliveryTime?.toIso8601String(),
       'payment_status': paymentStatus,
       'payment_method': paymentMethod,
+      'seller_name': sellerName,
+      'buyer_name': buyerName,
     };
   }
 

@@ -19,19 +19,28 @@ class ProductProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Use the seller products endpoint
-      final response = await _apiService.getSellerProducts();
-      print('Fetch products response: $response');
+      final response = await _apiService.getProducts();
+      print('Fetch products response success: ${response['success']}');
+      print('Fetch products data: ${response['data']}');
       
       if (response['success'] == true) {
         final data = response['data'];
         if (data is List) {
-          _products = data.map((item) => Product.fromJson(item)).toList();
+          _products = data.map((item) {
+            try {
+              return Product.fromJson(item);
+            } catch (e) {
+              print('Error parsing product: $e');
+              print('Product data: $item');
+              return null;
+            }
+          }).whereType<Product>().toList();
+          print('Products loaded: ${_products.length}');
         } else {
           _products = [];
+          print('Data is not a list: $data');
         }
         _filteredProducts = [];
-        print('Products loaded: ${_products.length}');
       } else {
         _error = response['error'] ?? 'Failed to load products';
         print('Error loading products: $_error');
@@ -45,33 +54,43 @@ class ProductProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> createProduct(Map<String, dynamic> productData) async {
+  // This method is for sellers - fetches their own products
+  Future<void> fetchSellerProducts() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _apiService.createProduct(productData);
-      print('Create product response: $response');
+      final response = await _apiService.getSellerProducts();
+      print('Fetch seller products response: $response');
       
       if (response['success'] == true) {
-        final newProduct = Product.fromJson(response['data']);
-        _products.insert(0, newProduct);
-        _isLoading = false;
-        notifyListeners();
-        return true;
+        final data = response['data'];
+        if (data is List) {
+          _products = data.map((item) {
+            try {
+              return Product.fromJson(item);
+            } catch (e) {
+              print('Error parsing product: $e');
+              return null;
+            }
+          }).whereType<Product>().toList();
+          print('Seller products loaded: ${_products.length}');
+        } else {
+          _products = [];
+        }
+        _filteredProducts = [];
       } else {
-        _error = response['error'] ?? 'Failed to create product';
-        _isLoading = false;
-        notifyListeners();
-        return false;
+        _error = response['error'] ?? 'Failed to load seller products';
+        print('Error loading seller products: $_error');
       }
     } catch (e) {
       _error = 'Network error: $e';
-      _isLoading = false;
-      notifyListeners();
-      return false;
+      print('Network error: $e');
     }
+
+    _isLoading = false;
+    notifyListeners();
   }
 
   void filterByCategory(String categoryName) {

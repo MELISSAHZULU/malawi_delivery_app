@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../models/user.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/formatters.dart';
 
@@ -24,22 +25,17 @@ class _DriverDashboardState extends State<DriverDashboard> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
             _buildHeader(user),
-            // Main Content
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Today's Earnings Card
                     _buildEarningsCard(),
                     const SizedBox(height: 16),
-                    // Stats Row
                     _buildStatsRow(),
                     const SizedBox(height: 16),
-                    // Assigned Deliveries
                     _buildAssignedDeliveries(),
                     const SizedBox(height: 16),
                   ],
@@ -73,7 +69,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
           if (index == 0) {
             // Already on dashboard
           } else if (index == 1) {
-            Navigator.pushNamed(context, AppRoutes.deliveries);
+            // Navigate to deliveries
           } else if (index == 2) {
             Navigator.pushNamed(context, AppRoutes.profile);
           }
@@ -282,7 +278,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
           ),
         ),
         const SizedBox(height: 12),
-        // Active Delivery
         _buildDeliveryCard(
           status: 'ACTIVE',
           id: 'MWD-84721',
@@ -295,7 +290,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
           isActive: true,
         ),
         const SizedBox(height: 12),
-        // Pending Delivery
         _buildDeliveryCard(
           status: 'PENDING',
           id: 'MWD-84698',

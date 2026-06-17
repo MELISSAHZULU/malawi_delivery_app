@@ -4,29 +4,23 @@ import '../../providers/auth_provider.dart';
 import '../../models/user.dart';
 import '../../routes/app_routes.dart';
 
-class BuyerProfileScreen extends StatefulWidget {
-  const BuyerProfileScreen({Key? key}) : super(key: key);
+class DriverProfileScreen extends StatefulWidget {
+  const DriverProfileScreen({Key? key}) : super(key: key);
 
   @override
-  State<BuyerProfileScreen> createState() => _BuyerProfileScreenState();
+  State<DriverProfileScreen> createState() => _DriverProfileScreenState();
 }
 
-class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
+class _DriverProfileScreenState extends State<DriverProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final user = authProvider.user;
 
-    if (user == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: const Text('Driver Profile'),
         backgroundColor: Colors.transparent,
         foregroundColor: const Color(0xFF0A1A2B),
         elevation: 0,
@@ -39,24 +33,19 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
             const SizedBox(height: 16),
             _buildStatsRow(),
             const SizedBox(height: 16),
+            _buildVehicleInfo(),
+            const SizedBox(height: 16),
+            _buildContactSettings(),
+            const SizedBox(height: 16),
             _buildMenuItems(),
             const SizedBox(height: 16),
-            Center(
-              child: Text(
-                'MalaWiDash v1.0.0',
-                style: TextStyle(
-                  color: Colors.grey.shade400,
-                  fontSize: 12,
-                ),
-              ),
-            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildProfileHeader(User user) {
+  Widget _buildProfileHeader(User? user) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -75,10 +64,10 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
           CircleAvatar(
             radius: 40,
             backgroundColor: Colors.grey.shade200,
-            child: user.profilePicture != null
+            child: user?.profilePicture != null
                 ? ClipOval(
                     child: Image.network(
-                      user.profilePicture!,
+                      user!.profilePicture!,
                       width: 80,
                       height: 80,
                       fit: BoxFit.cover,
@@ -99,7 +88,7 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            user.username,
+            user?.username ?? 'Driver',
             style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -108,7 +97,7 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            user.email,
+            user?.email ?? 'driver@example.com',
             style: TextStyle(
               color: Colors.grey.shade600,
               fontSize: 14,
@@ -125,7 +114,7 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: const Text(
-                  '★ 4.7',
+                  '4.9 Rating',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 12,
@@ -137,15 +126,15 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
+                  color: Colors.green,
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: Text(
-                  'Buyer since 2024',
+                child: const Text(
+                  '✔ Verified Driver',
                   style: TextStyle(
-                    color: Colors.grey.shade600,
+                    color: Colors.white,
                     fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
@@ -159,14 +148,14 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
   Widget _buildStatsRow() {
     return Row(
       children: [
-        _buildStatCard('24', 'Orders', Icons.shopping_bag_outlined),
-        _buildStatCard('8', 'Saved', Icons.favorite_border),
-        _buildStatCard('1,240', 'Points', Icons.stars),
+        _buildStatCard('342', 'Deliveries', Icons.delivery_dining, Colors.blue),
+        _buildStatCard('82K', 'Earnings', Icons.attach_money, Colors.green),
+        _buildStatCard('18', 'Avg Time', Icons.access_time, Colors.orange),
       ],
     );
   }
 
-  Widget _buildStatCard(String value, String label, IconData icon) {
+  Widget _buildStatCard(String value, String label, IconData icon, Color color) {
     return Expanded(
       child: Container(
         margin: const EdgeInsets.only(right: 8),
@@ -183,24 +172,148 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
         ),
         child: Column(
           children: [
-            Icon(icon, color: const Color(0xFF2A7DE1), size: 24),
+            Icon(icon, color: color, size: 20),
             const SizedBox(height: 4),
             Text(
               value,
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 16,
+                fontSize: 14,
               ),
             ),
             Text(
               label,
               style: TextStyle(
                 color: Colors.grey.shade600,
-                fontSize: 11,
+                fontSize: 10,
               ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildVehicleInfo() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.05),
+            blurRadius: 5,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Vehicle Information',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildInfoRow('Vehicle Type', 'Motorcycle'),
+          _buildInfoRow('Plate Number', 'MW 1234 A'),
+          _buildInfoRow('Model', 'Yamaha YBR 125'),
+          _buildInfoRow('Insurance', 'Valid until Dec 2025'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactSettings() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.05),
+            blurRadius: 5,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Contact & Settings',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildSettingRow(Icons.phone, 'Contact', '+265 88 456 7890'),
+          _buildSettingRow(Icons.notifications, 'Notifications', 'Delivery alerts, tips'),
+          _buildSettingRow(Icons.location_on, 'Service Area', 'Lilongwe, Blantyre'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: const Color(0xFF2A7DE1)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -209,39 +322,33 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
     return Column(
       children: [
         _buildMenuItem(
-          Icons.location_on_outlined,
-          'Saved Addresses',
-          'Area 18, Lilongwe',
-          () => Navigator.pushNamed(context, AppRoutes.savedAddresses),
+          Icons.history,
+          'Order History',
+          () => Navigator.pushNamed(context, AppRoutes.orderHistory),
         ),
         _buildMenuItem(
-          Icons.payment_outlined,
-          'Payment Methods',
-          'Airtel Money •••• 4567',
-          () => Navigator.pushNamed(context, AppRoutes.paymentMethods),
+          Icons.route,
+          'Delivery History',
+          () {},
+        ),
+        _buildMenuItem(
+          Icons.attach_money,
+          'Earnings',
+          () {},
         ),
         _buildMenuItem(
           Icons.notifications_outlined,
           'Notifications',
-          'Order updates, offers',
           () => Navigator.pushNamed(context, AppRoutes.notifications),
-        ),
-        _buildMenuItem(
-          Icons.star_border,
-          'Reviews & Ratings',
-          '4.7 average',
-          () {},
         ),
         _buildMenuItem(
           Icons.help_outline,
           'Help & Support',
-          '',
           () => Navigator.pushNamed(context, AppRoutes.helpSupport),
         ),
         _buildMenuItem(
           Icons.logout,
           'Logout',
-          '',
           () async {
             final confirm = await showDialog<bool>(
               context: context,
@@ -285,46 +392,22 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
   Widget _buildMenuItem(
     IconData icon,
     String title,
-    String subtitle,
     VoidCallback onTap, {
     bool isDestructive = false,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.05),
-            blurRadius: 5,
-          ),
-        ],
+    return ListTile(
+      leading: Icon(
+        icon,
+        color: isDestructive ? Colors.red : const Color(0xFF0A1A2B),
       ),
-      child: ListTile(
-        leading: Icon(
-          icon,
-          color: isDestructive ? Colors.red : const Color(0xFF0A1A2B),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: isDestructive ? Colors.red : null,
         ),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: isDestructive ? Colors.red : null,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        subtitle: subtitle.isNotEmpty
-            ? Text(
-                subtitle,
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 13,
-                ),
-              )
-            : null,
-        trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-        onTap: onTap,
       ),
+      trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+      onTap: onTap,
     );
   }
 }
