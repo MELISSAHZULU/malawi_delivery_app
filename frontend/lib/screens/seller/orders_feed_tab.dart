@@ -13,6 +13,7 @@ class OrdersFeedTab extends StatefulWidget {
 
 class _OrdersFeedTabState extends State<OrdersFeedTab> {
   String _selectedFilter = 'All';
+  bool _isUpdating = false;
 
   @override
   void initState() {
@@ -74,7 +75,7 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
               ),
             ),
             Expanded(
-              child: orderProvider.isLoading
+              child: orderProvider.isLoading || _isUpdating
                   ? const Center(child: CircularProgressIndicator())
                   : filteredOrders.isEmpty
                       ? Center(
@@ -287,13 +288,14 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
               ],
             ),
           ),
+          // Action buttons based on status
           if (isPending) ...[
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => _updateOrderStatus(order.id, 'confirmed'),
+                    onPressed: _isUpdating ? null : () => _updateOrderStatus(order.id, 'confirmed'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0A1A2B),
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -301,13 +303,15 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: const Text('Accept Order'),
+                    child: _isUpdating
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('Accept Order'),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => _updateOrderStatus(order.id, 'cancelled'),
+                    onPressed: _isUpdating ? null : () => _updateOrderStatus(order.id, 'cancelled'),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Colors.red),
                       foregroundColor: Colors.red,
@@ -316,7 +320,9 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: const Text('Reject'),
+                    child: _isUpdating
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('Reject'),
                   ),
                 ),
               ],
@@ -328,7 +334,7 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => _updateOrderStatus(order.id, 'preparing'),
+                    onPressed: _isUpdating ? null : () => _updateOrderStatus(order.id, 'preparing'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -336,13 +342,15 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: const Text('Start Preparing'),
+                    child: _isUpdating
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('Start Preparing'),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => _updateOrderStatus(order.id, 'cancelled'),
+                    onPressed: _isUpdating ? null : () => _updateOrderStatus(order.id, 'cancelled'),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Colors.red),
                       foregroundColor: Colors.red,
@@ -351,7 +359,9 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: const Text('Cancel'),
+                    child: _isUpdating
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('Cancel'),
                   ),
                 ),
               ],
@@ -359,18 +369,24 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
           ],
           if (isPreparing) ...[
             const SizedBox(height: 12),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () => _updateOrderStatus(order.id, 'ready'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isUpdating ? null : () => _updateOrderStatus(order.id, 'ready'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: _isUpdating
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('Mark Ready'),
                   ),
                 ),
-                child: const Text('Mark Ready'),
-              ),
+              ],
             ),
           ],
           if (isReady) ...[
@@ -427,15 +443,35 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
   }
 
   Future<void> _updateOrderStatus(dynamic orderId, String newStatus) async {
+    if (_isUpdating) return;
+    
+    setState(() => _isUpdating = true);
+
     try {
       final apiService = ApiService();
-      final response = await apiService.updateOrderStatus(
-        int.tryParse(orderId?.toString() ?? '0') ?? 0,
-        newStatus
-      );
       
+      // Parse order ID safely
+      int orderIdInt = 0;
+      if (orderId is int) {
+        orderIdInt = orderId;
+      } else if (orderId is String) {
+        orderIdInt = int.tryParse(orderId) ?? 0;
+      }
+      
+      if (orderIdInt == 0) {
+        throw Exception('Invalid order ID: $orderId');
+      }
+
+      print('📝 Updating order $orderIdInt to status: $newStatus');
+      
+      final response = await apiService.updateOrderStatus(orderIdInt, newStatus);
+
+      print('📝 Update order response: $response');
+
       if (response['success'] == true) {
+        // Refresh orders to get the updated status
         await _loadOrders();
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('✅ Order ${_getStatusDisplay(newStatus)}!'),
@@ -444,7 +480,6 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
           ),
         );
       } else {
-        await _loadOrders();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('❌ ${response['error'] ?? 'Failed to update order'}'),
@@ -453,13 +488,17 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
         );
       }
     } catch (e) {
-      await _loadOrders();
+      print('❌ Error updating order: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('❌ Error: ${e.toString()}'),
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdating = false);
+      }
     }
   }
 
