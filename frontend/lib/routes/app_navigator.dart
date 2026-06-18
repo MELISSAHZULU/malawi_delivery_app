@@ -19,6 +19,9 @@ import '../screens/shared/help_support_screen.dart';
 import '../screens/shared/saved_addresses_screen.dart';
 import '../screens/shared/payment_methods_screen.dart';
 import '../screens/seller/add_product_screen.dart';
+import '../screens/seller/edit_product_screen.dart';
+import '../screens/seller/edit_shop_profile_screen.dart';
+import '../screens/seller/shop_profile_tab.dart';
 
 class AppNavigator {
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -54,7 +57,6 @@ class AppNavigator {
       case AppRoutes.buyerProfile:
         return MaterialPageRoute(builder: (_) => const BuyerProfileScreen());
       case AppRoutes.profile:
-        // Simple approach - use buyer profile for now
         return MaterialPageRoute(builder: (_) => const BuyerProfileScreen());
       case AppRoutes.notifications:
         return MaterialPageRoute(builder: (_) => const NotificationsScreen());
@@ -66,6 +68,13 @@ class AppNavigator {
         return MaterialPageRoute(builder: (_) => const PaymentMethodsScreen());
       case AppRoutes.addProduct:
         return MaterialPageRoute(builder: (_) => const AddProductScreen());
+      case AppRoutes.editProduct:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return MaterialPageRoute(
+          builder: (_) => EditProductScreen(productId: args?['productId'] ?? 0),
+        );
+      case AppRoutes.editShopProfile:
+        return MaterialPageRoute(builder: (_) => const EditShopProfileScreen());
       case AppRoutes.deliveryDetail:
         return MaterialPageRoute(builder: (_) => const DeliveryDetailScreen());
       case AppRoutes.driverProfile:

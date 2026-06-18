@@ -22,6 +22,7 @@ class AppRoutes {
   static const String orders = '/orders';
   static const String addProduct = '/add-product';
   static const String editProduct = '/edit-product';
+  static const String editShopProfile = '/edit-shop-profile';
   
   static const String savedAddresses = '/saved-addresses';
   static const String paymentMethods = '/payment-methods';
