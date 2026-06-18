@@ -26,13 +26,14 @@ class OrderListView(generics.ListCreateAPIView):
         if user.role == 'buyer':
             queryset = Order.objects.filter(buyer__user=user).order_by('-created_at')
         elif user.role == 'seller':
+            # Filter orders where the seller is the logged-in user
             queryset = Order.objects.filter(seller__user=user).order_by('-created_at')
         elif user.role == 'driver':
             queryset = Order.objects.filter(driver=user).order_by('-created_at')
         else:
             queryset = Order.objects.none()
         
-        print(f"Found {queryset.count()} orders")
+        print(f"Found {queryset.count()} orders for {user.username}")
         return queryset
     
     def create(self, request, *args, **kwargs):
@@ -134,6 +135,12 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'seller':
+            return Order.objects.filter(seller__user=user)
+        return Order.objects.all()
     
     def update(self, request, *args, **kwargs):
         order = self.get_object()

@@ -22,7 +22,7 @@ class OrderProvider extends ChangeNotifier {
 
     try {
       final response = await _apiService.getOrders();
-      print('Fetch orders response: $response');
+      print('Fetch orders response success: ${response['success']}');
       
       if (response['success'] == true) {
         final data = response['data'];
@@ -38,7 +38,6 @@ class OrderProvider extends ChangeNotifier {
           print('Orders loaded: ${_orders.length}');
         } else {
           _orders = [];
-          print('Data is not a list: $data');
         }
       } else {
         _error = response['error'] ?? 'Failed to fetch orders';
@@ -96,7 +95,6 @@ class OrderProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // First, try to find the order in the existing list
       final existingOrder = _orders.firstWhere(
         (o) => o.id == orderId,
         orElse: () => throw Exception('Order not found'),
@@ -104,7 +102,6 @@ class OrderProvider extends ChangeNotifier {
       _currentOrder = existingOrder;
       print('Found order in list: ${_currentOrder?.orderNumber}');
     } catch (e) {
-      // If not found in list, fetch from API
       try {
         final response = await _apiService.getOrder(orderId);
         print('Track order response: $response');
@@ -115,15 +112,12 @@ class OrderProvider extends ChangeNotifier {
             print('Order loaded: ${_currentOrder?.orderNumber}');
           } catch (parseError) {
             _error = 'Error parsing order: $parseError';
-            print('Parse error: $parseError');
           }
         } else {
           _error = response['error'] ?? 'Order not found';
-          print('Error tracking order: $_error');
         }
       } catch (apiError) {
         _error = 'Network error: $apiError';
-        print('Network error: $apiError');
       }
     }
 
@@ -131,12 +125,32 @@ class OrderProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateOrderStatus(Order order) {
-    final index = _orders.indexWhere((o) => o.id == order.id);
+  void updateOrderStatusLocally(String orderId, String newStatus) {
+    final index = _orders.indexWhere((o) => o.id == orderId);
     if (index != -1) {
-      _orders[index] = order;
-      if (_currentOrder?.id == order.id) {
-        _currentOrder = order;
+      // Create a new order object with updated status
+      final oldOrder = _orders[index];
+      final updatedOrder = Order(
+        id: oldOrder.id,
+        orderNumber: oldOrder.orderNumber,
+        status: newStatus,
+        items: oldOrder.items,
+        subtotal: oldOrder.subtotal,
+        deliveryFee: oldOrder.deliveryFee,
+        total: oldOrder.total,
+        deliveryAddress: oldOrder.deliveryAddress,
+        driverName: oldOrder.driverName,
+        driverPhone: oldOrder.driverPhone,
+        createdAt: oldOrder.createdAt,
+        estimatedDeliveryTime: oldOrder.estimatedDeliveryTime,
+        paymentStatus: oldOrder.paymentStatus,
+        paymentMethod: oldOrder.paymentMethod,
+        sellerName: oldOrder.sellerName,
+        buyerName: oldOrder.buyerName,
+      );
+      _orders[index] = updatedOrder;
+      if (_currentOrder?.id == orderId) {
+        _currentOrder = updatedOrder;
       }
       notifyListeners();
     }

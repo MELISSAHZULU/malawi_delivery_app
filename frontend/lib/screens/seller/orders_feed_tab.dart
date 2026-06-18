@@ -29,94 +29,121 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
   @override
   Widget build(BuildContext context) {
     final orderProvider = Provider.of<OrderProvider>(context);
-    final orders = orderProvider.orders;
+    final allOrders = orderProvider.orders;
+    
+    // Filter orders based on selected filter
+    final filteredOrders = _getFilteredOrders(allOrders);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: RefreshIndicator(
         onRefresh: _loadOrders,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Orders Feed',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Manage incoming customer orders',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey,
-                ),
-              ),
-              const SizedBox(height: 16),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _buildFilterChip('All'),
-                    _buildFilterChip('Pending'),
-                    _buildFilterChip('Confirmed'),
-                    _buildFilterChip('Preparing'),
-                    _buildFilterChip('Delivered'),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              if (orderProvider.isLoading || _isUpdating)
-                const Center(child: CircularProgressIndicator())
-              else if (orders.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Orders Feed',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  child: const Center(
-                    child: Column(
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Manage incoming customer orders',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Filter chips - Horizontal scroll
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
                       children: [
-                        Icon(Icons.shopping_bag_outlined, size: 48, color: Colors.grey),
-                        SizedBox(height: 8),
-                        Text(
-                          'No orders yet',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Orders from customers will appear here',
-                          style: TextStyle(color: Colors.grey, fontSize: 12),
-                        ),
+                        _buildFilterChip('All'),
+                        _buildFilterChip('Pending'),
+                        _buildFilterChip('Confirmed'),
+                        _buildFilterChip('Preparing'),
+                        _buildFilterChip('Delivered'),
                       ],
                     ),
                   ),
-                )
-              else
-                ..._getFilteredOrders(orders).map((order) => _buildOrderCard(order)),
-            ],
-          ),
+                ],
+              ),
+            ),
+            // Orders List
+            Expanded(
+              child: orderProvider.isLoading || _isUpdating
+                  ? const Center(child: CircularProgressIndicator())
+                  : filteredOrders.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.shopping_bag_outlined, size: 48, color: Colors.grey.shade400),
+                              const SizedBox(height: 16),
+                              Text(
+                                _selectedFilter == 'All' 
+                                    ? 'No orders yet' 
+                                    : 'No ${_selectedFilter.toLowerCase()} orders',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _selectedFilter == 'All'
+                                    ? 'Orders from customers will appear here'
+                                    : 'No orders with status: $_selectedFilter',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade400,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: filteredOrders.length,
+                          itemBuilder: (context, index) {
+                            final order = filteredOrders[index];
+                            return _buildOrderCard(order);
+                          },
+                        ),
+            ),
+          ],
         ),
       ),
     );
   }
 
   List<dynamic> _getFilteredOrders(List<dynamic> orders) {
-    if (_selectedFilter == 'All') return orders;
-    return orders.where((o) => 
-      o.status?.toLowerCase() == _selectedFilter.toLowerCase()
-    ).toList();
+    if (_selectedFilter == 'All') {
+      return orders;
+    }
+    return orders.where((o) {
+      final status = o.status?.toLowerCase() ?? '';
+      return status == _selectedFilter.toLowerCase();
+    }).toList();
   }
 
   Widget _buildFilterChip(String label) {
     final isSelected = _selectedFilter == label;
     return GestureDetector(
       onTap: () {
-        setState(() => _selectedFilter = label);
+        setState(() {
+          _selectedFilter = label;
+        });
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -450,19 +477,19 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
     );
   }
 
-  Future<void> _updateOrderStatus(String orderId, String newStatus) async {
+  Future<void> _updateOrderStatus(dynamic orderId, String newStatus) async {
     if (_isUpdating) return;
     
     setState(() => _isUpdating = true);
 
     try {
       // Parse order ID to int
-      final int orderIdInt = int.tryParse(orderId) ?? 0;
+      final int orderIdInt = int.tryParse(orderId?.toString() ?? '0') ?? 0;
       if (orderIdInt == 0) {
         throw Exception('Invalid order ID');
       }
 
-      print('Updating order $orderId to status: $newStatus');
+      print('Updating order $orderIdInt to status: $newStatus');
       
       // Call API to update order status
       final response = await _apiService.updateOrderStatus(orderIdInt, newStatus);

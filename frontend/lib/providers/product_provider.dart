@@ -20,8 +20,6 @@ class ProductProvider extends ChangeNotifier {
 
     try {
       final response = await _apiService.getProducts();
-      print('Fetch products response success: ${response['success']}');
-      print('Fetch products data: ${response['data']}');
       
       if (response['success'] == true) {
         final data = response['data'];
@@ -31,30 +29,24 @@ class ProductProvider extends ChangeNotifier {
               return Product.fromJson(item);
             } catch (e) {
               print('Error parsing product: $e');
-              print('Product data: $item');
               return null;
             }
           }).whereType<Product>().toList();
-          print('Products loaded: ${_products.length}');
         } else {
           _products = [];
-          print('Data is not a list: $data');
         }
         _filteredProducts = [];
       } else {
         _error = response['error'] ?? 'Failed to load products';
-        print('Error loading products: $_error');
       }
     } catch (e) {
       _error = 'Network error: $e';
-      print('Network error: $e');
     }
 
     _isLoading = false;
     notifyListeners();
   }
 
-  // This method is for sellers - fetches their own products
   Future<void> fetchSellerProducts() async {
     _isLoading = true;
     _error = null;
@@ -82,15 +74,106 @@ class ProductProvider extends ChangeNotifier {
         _filteredProducts = [];
       } else {
         _error = response['error'] ?? 'Failed to load seller products';
-        print('Error loading seller products: $_error');
       }
     } catch (e) {
       _error = 'Network error: $e';
-      print('Network error: $e');
     }
 
     _isLoading = false;
     notifyListeners();
+  }
+
+  Future<bool> createProduct(Map<String, dynamic> productData) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.createProduct(productData);
+      print('Create product response: $response');
+      
+      if (response['success'] == true) {
+        try {
+          final newProduct = Product.fromJson(response['data']);
+          _products.insert(0, newProduct);
+          _isLoading = false;
+          notifyListeners();
+          return true;
+        } catch (e) {
+          _error = 'Error parsing product data: $e';
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+      } else {
+        _error = response['error'] ?? 'Failed to create product';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _error = 'Network error: $e';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> updateProduct(int productId, Map<String, dynamic> productData) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.updateProduct(productId, productData);
+      print('Update product response: $response');
+      
+      if (response['success'] == true) {
+        // Refresh products
+        await fetchSellerProducts();
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _error = response['error'] ?? 'Failed to update product';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _error = 'Network error: $e';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteProduct(int productId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.deleteProduct(productId);
+      print('Delete product response: $response');
+      
+      if (response['success'] == true) {
+        _products.removeWhere((p) => p.id == productId);
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _error = response['error'] ?? 'Failed to delete product';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _error = 'Network error: $e';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 
   void filterByCategory(String categoryName) {

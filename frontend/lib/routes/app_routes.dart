@@ -3,12 +3,10 @@ class AppRoutes {
   static const String login = '/login';
   static const String register = '/register';
   
-  // Role-based home screens
   static const String buyerHome = '/buyer-home';
   static const String sellerHome = '/seller-home';
   static const String driverHome = '/driver-home';
   
-  // Buyer screens
   static const String productDetail = '/product-detail';
   static const String cart = '/cart';
   static const String checkout = '/checkout';
@@ -16,17 +14,15 @@ class AppRoutes {
   static const String orderHistory = '/order-history';
   static const String buyerProfile = '/buyer-profile';
   
-  // Driver screens
   static const String deliveries = '/deliveries';
   static const String deliveryDetail = '/delivery-detail';
   static const String driverProfile = '/driver-profile';
   
-  // Shared screens
   static const String profile = '/profile';
   static const String orders = '/orders';
   static const String addProduct = '/add-product';
+  static const String editProduct = '/edit-product';
   
-  // Profile sub-screens
   static const String savedAddresses = '/saved-addresses';
   static const String paymentMethods = '/payment-methods';
   static const String notifications = '/notifications';
