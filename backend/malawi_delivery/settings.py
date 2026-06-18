@@ -110,3 +110,6 @@ PAYCHANGU_SECRET_KEY = os.getenv('PAYCHANGU_SECRET_KEY', '')
 PAYCHANGU_BASE_URL = os.getenv('PAYCHANGU_BASE_URL', 'https://api.paychangu.com/v1')
 PAYCHANGU_CALLBACK_URL = os.getenv('PAYCHANGU_CALLBACK_URL', '')
 PAYCHANGU_REDIRECT_URL = os.getenv('PAYCHANGU_REDIRECT_URL', '')
+
+# Notifications app
+INSTALLED_APPS += ['notifications']
