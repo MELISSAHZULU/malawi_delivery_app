@@ -8,6 +8,7 @@ class User {
   final bool isVerified;
   final String? location;
   final String? storeName;
+  final List<String> deliveryAddresses;
 
   User({
     required this.id,
@@ -19,6 +20,7 @@ class User {
     this.isVerified = false,
     this.location,
     this.storeName,
+    this.deliveryAddresses = const [],
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,9 @@ class User {
       isVerified: json['is_verified'] ?? false,
       location: json['location'],
       storeName: json['store_name'],
+      deliveryAddresses: json['delivery_addresses'] != null
+          ? List<String>.from(json['delivery_addresses'])
+          : [],
     );
   }
 
@@ -46,6 +51,7 @@ class User {
       'is_verified': isVerified,
       'location': location,
       'store_name': storeName,
+      'delivery_addresses': deliveryAddresses,
     };
   }
 

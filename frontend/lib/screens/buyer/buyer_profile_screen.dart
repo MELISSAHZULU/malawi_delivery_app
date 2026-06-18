@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/order_provider.dart';
 import '../../models/user.dart';
 import '../../routes/app_routes.dart';
+import '../../utils/formatters.dart';
 
 class BuyerProfileScreen extends StatefulWidget {
   const BuyerProfileScreen({Key? key}) : super(key: key);
@@ -15,6 +17,7 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
+    final orderProvider = Provider.of<OrderProvider>(context);
     final user = authProvider.user;
 
     if (user == null) {
@@ -23,6 +26,12 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
       );
     }
 
+    // Calculate real stats from orders
+    final totalOrders = orderProvider.orders.length;
+    final totalSpent = orderProvider.orders
+        .where((o) => o.status == 'delivered')
+        .fold(0.0, (sum, o) => sum + o.total);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -30,6 +39,12 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
         backgroundColor: Colors.transparent,
         foregroundColor: const Color(0xFF0A1A2B),
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () {},
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -37,7 +52,7 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
           children: [
             _buildProfileHeader(user),
             const SizedBox(height: 16),
-            _buildStatsRow(),
+            _buildStatsRow(totalOrders, totalSpent),
             const SizedBox(height: 16),
             _buildMenuItems(),
             const SizedBox(height: 16),
@@ -114,54 +129,27 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
               fontSize: 14,
             ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.amber,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  '★ 4.7',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+          if (user.phoneNumber != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              user.phoneNumber!,
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 14,
               ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  'Buyer since 2024',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildStatsRow() {
+  Widget _buildStatsRow(int totalOrders, double totalSpent) {
     return Row(
       children: [
-        _buildStatCard('24', 'Orders', Icons.shopping_bag_outlined),
-        _buildStatCard('8', 'Saved', Icons.favorite_border),
-        _buildStatCard('1,240', 'Points', Icons.stars),
+        _buildStatCard('$totalOrders', 'Orders', Icons.shopping_bag_outlined),
+        _buildStatCard('${totalSpent > 0 ? totalSpent.toStringAsFixed(0) : 0}', 'Spent', Icons.attach_money),
+        _buildStatCard('${totalOrders > 0 ? (totalSpent / totalOrders).toStringAsFixed(0) : 0}', 'Avg Order', Icons.trending_up),
       ],
     );
   }
@@ -211,31 +199,32 @@ class _BuyerProfileScreenState extends State<BuyerProfileScreen> {
         _buildMenuItem(
           Icons.location_on_outlined,
           'Saved Addresses',
-          'Area 18, Lilongwe',
+          'Add and manage your delivery addresses',
           () => Navigator.pushNamed(context, AppRoutes.savedAddresses),
         ),
         _buildMenuItem(
           Icons.payment_outlined,
           'Payment Methods',
-          'Airtel Money •••• 4567',
+          'Manage your payment options',
           () => Navigator.pushNamed(context, AppRoutes.paymentMethods),
-        ),
-        _buildMenuItem(
-          Icons.notifications_outlined,
-          'Notifications',
-          'Order updates, offers',
-          () => Navigator.pushNamed(context, AppRoutes.notifications),
         ),
         _buildMenuItem(
           Icons.star_border,
           'Reviews & Ratings',
-          '4.7 average',
-          () {},
+          'View your reviews',
+          () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Reviews feature coming soon!'),
+                duration: Duration(seconds: 1),
+              ),
+            );
+          },
         ),
         _buildMenuItem(
           Icons.help_outline,
           'Help & Support',
-          '',
+          'Get help with your orders',
           () => Navigator.pushNamed(context, AppRoutes.helpSupport),
         ),
         _buildMenuItem(

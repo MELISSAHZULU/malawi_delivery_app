@@ -147,6 +147,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                 color: Colors.grey.shade600,
               ),
             ),
+            const SizedBox(height: 4),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
@@ -176,7 +177,14 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
             ),
             if (isDelivered)
               TextButton(
-                onPressed: () {},
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Reorder feature coming soon!'),
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                },
                 child: const Text('Reorder >'),
               ),
           ],
@@ -185,35 +193,97 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (order.sellerName != null)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      order.sellerName!,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade700,
-                      ),
+                // Seller Name
+                if (order.sellerName != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.store, size: 16, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            order.sellerName!,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                  const SizedBox(height: 12),
+                ],
+
+                // Order Items with quantities and prices
+                const Text(
+                  'Items',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 if (order.items.isNotEmpty)
-                  ...order.items.map((item) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
+                  ...order.items.map((item) => Container(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: Colors.grey.shade100, width: 0.5),
+                      ),
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('${item.quantity}x ${item.name}'),
-                        Text(Formatters.currencyFormat(item.price * item.quantity)),
+                        Expanded(
+                          child: Text(
+                            '${item.quantity}x ${item.name}',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                        Text(
+                          Formatters.currencyFormat(item.price * item.quantity),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
                       ],
                     ),
                   )),
+                
                 const Divider(),
+                
+                // Order Summary
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Total'),
+                    const Text('Subtotal'),
+                    Text(Formatters.currencyFormat(order.subtotal)),
+                  ],
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Delivery Fee'),
+                    Text(Formatters.currencyFormat(order.deliveryFee)),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Total',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     Text(
                       Formatters.currencyFormat(order.total),
                       style: const TextStyle(
@@ -223,40 +293,132 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 12),
+                
+                // Delivery Address
                 if (order.deliveryAddress.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on, size: 16, color: Colors.grey),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          order.deliveryAddress,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
+                  const Text(
+                    'Delivery Address',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            order.deliveryAddress,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade700,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
+                
+                // Driver Info
                 if (order.driverName != null) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Delivery Driver',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Row(
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.delivery_dining, size: 16, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                order.driverName!,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              if (order.driverPhone != null)
+                                Text(
+                                  order.driverPhone!,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                
+                // Payment Method
+                const SizedBox(height: 8),
+                const Text(
+                  'Payment Method',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
                     children: [
-                      const Icon(Icons.delivery_dining, size: 16, color: Colors.grey),
-                      const SizedBox(width: 4),
+                      const Icon(Icons.payment, size: 16, color: Colors.grey),
+                      const SizedBox(width: 8),
                       Text(
-                        'Driver: ${order.driverName}',
+                        order.paymentMethod ?? 'PayChangu',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        order.paymentStatus ?? 'Completed',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade600,
+                          color: Colors.green.shade700,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
                   ),
-                ],
+                ),
               ],
             ),
           ),
