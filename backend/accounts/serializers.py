@@ -19,17 +19,14 @@ class UserSerializer(serializers.ModelSerializer):
         return None
 
 class SellerProfileSerializer(serializers.ModelSerializer):
-    store_name = serializers.CharField(source='store_name', read_only=False)
-    phone_number = serializers.CharField(source='user.phone_number', read_only=False)
-    address = serializers.CharField(source='address', read_only=False)
-    location = serializers.CharField(source='user.location', read_only=False)
+    phone_number = serializers.CharField(source='user.phone_number', required=False, allow_blank=True)
+    location = serializers.CharField(source='user.location', required=False, allow_blank=True)
     
     class Meta:
         model = SellerProfile
         fields = [
-            'store_name', 'store_description', 'store_logo', 'store_banner',
-            'address', 'latitude', 'longitude', 'is_active', 'opening_hours',
-            'delivery_fee', 'phone_number', 'location'
+            'store_name', 'store_description', 'address', 'delivery_fee', 
+            'phone_number', 'location', 'is_active', 'opening_hours'
         ]
     
     def update(self, instance, validated_data):
@@ -103,7 +100,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             )
             # Create wallet for seller
             from payments.models import SellerWallet
-            SellerWallet.objects.create(seller=seller)
+            SellerWallet.objects.get_or_create(seller=seller)
         elif user.role == 'driver':
             DriverProfile.objects.create(
                 user=user,
