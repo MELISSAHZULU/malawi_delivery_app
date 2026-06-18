@@ -1,8 +1,10 @@
-from rest_framework import generics, filters
+from rest_framework import generics, filters, status
+from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import Category, Product
 from .serializers import CategorySerializer, ProductSerializer, ProductCreateSerializer
+from accounts.models import SellerProfile  # Add this import
 
 class CategoryListView(generics.ListAPIView):
     permission_classes = [AllowAny]
@@ -17,7 +19,13 @@ class ProductListView(generics.ListAPIView):
     filterset_fields = ['category', 'is_premium', 'is_featured']
     search_fields = ['name', 'description', 'seller__store_name']
     ordering_fields = ['price', 'rating', 'created_at']
-    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        seller_id = self.request.query_params.get('seller')
+        if seller_id:
+            queryset = queryset.filter(seller_id=seller_id)
+        return queryset
 
 class ProductDetailView(generics.RetrieveAPIView):
     permission_classes = [AllowAny]
@@ -27,35 +35,38 @@ class ProductDetailView(generics.RetrieveAPIView):
 class SellerProductListView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     
-    def get_queryset(self):
-        return Product.objects.filter(seller__user=self.request.user)
-    
     def get_serializer_class(self):
         if self.request.method == 'POST':
             return ProductCreateSerializer
         return ProductSerializer
     
+    def get_queryset(self):
+        # Get products for the logged-in seller
+        return Product.objects.filter(seller__user=self.request.user)
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
     def perform_create(self, serializer):
-        seller = SellerProfile.objects.get(user=self.request.user)
-        serializer.save(seller=seller)
+        try:
+            seller = SellerProfile.objects.get(user=self.request.user)
+            serializer.save(seller=seller)
+        except SellerProfile.DoesNotExist:
+            raise serializers.ValidationError({'error': 'Seller profile not found'})
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            self.perform_create(serializer)
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class SellerProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = ProductCreateSerializer
-    
-    def get_queryset(self):
-        return Product.objects.filter(seller__user=self.request.user)
-
-# marketplace/views.py
-class SellerProductDetailView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = ProductSerializer
-    
-    def get_queryset(self):
-        return Product.objects.filter(seller__user=self.request.user)
-class SellerProductDetailView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = ProductSerializer
     
     def get_queryset(self):
         return Product.objects.filter(seller__user=self.request.user)

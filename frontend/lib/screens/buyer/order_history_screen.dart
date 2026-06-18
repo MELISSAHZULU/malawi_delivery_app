@@ -92,7 +92,29 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     final status = order.status;
     final isDelivered = status == 'delivered';
     final isCancelled = status == 'cancelled';
-    final statusColor = isDelivered ? Colors.green : (isCancelled ? Colors.red : Colors.orange);
+    final isPending = status == 'pending';
+    final isConfirmed = status == 'confirmed';
+    final isPreparing = status == 'preparing';
+    
+    Color getStatusColor() {
+      if (isDelivered) return Colors.green;
+      if (isCancelled) return Colors.red;
+      if (isPending) return Colors.orange;
+      if (isConfirmed) return Colors.blue;
+      if (isPreparing) return Colors.purple;
+      return Colors.grey;
+    }
+
+    String getStatusText() {
+      if (isDelivered) return 'Delivered';
+      if (isCancelled) return 'Cancelled';
+      if (isPending) return 'Pending';
+      if (isConfirmed) return 'Confirmed';
+      if (isPreparing) return 'Preparing';
+      return status;
+    }
+
+    final statusColor = getStatusColor();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -105,7 +127,9 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
-            isDelivered ? Icons.check : (isCancelled ? Icons.close : Icons.pending),
+            isDelivered ? Icons.check_circle : 
+            isCancelled ? Icons.cancel : 
+            Icons.pending,
             color: statusColor,
           ),
         ),
@@ -130,7 +154,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                status.toUpperCase(),
+                getStatusText().toUpperCase(),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 10,
@@ -199,6 +223,40 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                     ),
                   ],
                 ),
+                if (order.deliveryAddress.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          order.deliveryAddress,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                if (order.driverName != null) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.delivery_dining, size: 16, color: Colors.grey),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Driver: ${order.driverName}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
