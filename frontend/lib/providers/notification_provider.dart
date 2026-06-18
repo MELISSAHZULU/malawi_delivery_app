@@ -13,6 +13,11 @@ class NotificationProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
+  NotificationProvider() {
+    // Auto-fetch notifications when provider is created
+    fetchNotifications();
+  }
+
   Future<void> fetchNotifications() async {
     _isLoading = true;
     _error = null;
@@ -20,17 +25,26 @@ class NotificationProvider extends ChangeNotifier {
 
     try {
       final response = await _apiService.getNotifications();
+      print('Fetch notifications response: $response');
       
       if (response['success'] == true) {
-        _notifications = (response['data'] as List)
-            .map((item) => Map<String, dynamic>.from(item))
-            .toList();
-        _unreadCount = _notifications.where((n) => n['is_read'] == false).length;
+        final data = response['data'];
+        if (data is List) {
+          _notifications = data
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList();
+          _unreadCount = _notifications.where((n) => n['is_read'] == false).length;
+          print('Notifications loaded: ${_notifications.length}');
+        } else {
+          _notifications = [];
+        }
       } else {
         _error = response['error'] ?? 'Failed to fetch notifications';
+        print('Error loading notifications: $_error');
       }
     } catch (e) {
       _error = 'Network error: $e';
+      print('Network error: $e');
     }
 
     _isLoading = false;

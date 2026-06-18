@@ -5,9 +5,9 @@ import '../../providers/product_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/formatters.dart';
+import '../../services/api_service.dart';
 import 'add_product_screen.dart';
 import 'edit_product_screen.dart';
-import 'orders_feed_tab.dart';
 
 class SellerDashboardScreen extends StatefulWidget {
   const SellerDashboardScreen({Key? key}) : super(key: key);
@@ -219,8 +219,9 @@ class _DashboardTabState extends State<DashboardTab> {
                       Expanded(
                         child: OutlinedButton(
                           onPressed: () {
-                            // Navigate to Order History
-                            Navigator.pushNamed(context, AppRoutes.orderHistory);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Withdrawal history coming soon!')),
+                            );
                           },
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.white,
@@ -727,6 +728,542 @@ class _ProductsTabState extends State<ProductsTab> {
   }
 }
 
+// ==================== ORDERS FEED TAB ====================
+class OrdersFeedTab extends StatefulWidget {
+  const OrdersFeedTab({Key? key}) : super(key: key);
+
+  @override
+  State<OrdersFeedTab> createState() => _OrdersFeedTabState();
+}
+
+class _OrdersFeedTabState extends State<OrdersFeedTab> {
+  String _selectedFilter = 'All';
+  bool _isUpdating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOrders();
+  }
+
+  Future<void> _loadOrders() async {
+    await Provider.of<OrderProvider>(context, listen: false).fetchOrders();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final orderProvider = Provider.of<OrderProvider>(context);
+    final allOrders = orderProvider.orders;
+    
+    final filteredOrders = _getFilteredOrders(allOrders);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: RefreshIndicator(
+        onRefresh: _loadOrders,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Orders Feed',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Manage incoming customer orders',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildFilterChip('All'),
+                        _buildFilterChip('Pending'),
+                        _buildFilterChip('Confirmed'),
+                        _buildFilterChip('Preparing'),
+                        _buildFilterChip('Delivered'),
+                        _buildFilterChip('Cancelled'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: orderProvider.isLoading || _isUpdating
+                  ? const Center(child: CircularProgressIndicator())
+                  : filteredOrders.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.shopping_bag_outlined, size: 48, color: Colors.grey.shade400),
+                              const SizedBox(height: 16),
+                              Text(
+                                _selectedFilter == 'All' 
+                                    ? 'No orders yet' 
+                                    : 'No ${_selectedFilter.toLowerCase()} orders',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _selectedFilter == 'All'
+                                    ? 'Orders from customers will appear here'
+                                    : 'No orders with status: $_selectedFilter',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade400,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: filteredOrders.length,
+                          itemBuilder: (context, index) {
+                            final order = filteredOrders[index];
+                            return _buildOrderCard(order);
+                          },
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<dynamic> _getFilteredOrders(List<dynamic> orders) {
+    if (_selectedFilter == 'All') {
+      return orders;
+    }
+    return orders.where((o) {
+      final status = o.status?.toLowerCase() ?? '';
+      return status == _selectedFilter.toLowerCase();
+    }).toList();
+  }
+
+  Widget _buildFilterChip(String label) {
+    final isSelected = _selectedFilter == label;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedFilter = label;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        margin: const EdgeInsets.only(right: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF0A1A2B) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? Colors.transparent : Colors.grey.shade300,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.grey.shade600,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrderCard(dynamic order) {
+    final items = order.items ?? [];
+    final total = order.total ?? 0;
+    final customer = order.buyerName ?? 'Customer';
+    final status = order.status ?? 'pending';
+    final isPending = status == 'pending';
+    final isConfirmed = status == 'confirmed';
+    final isPreparing = status == 'preparing';
+    final isReady = status == 'ready';
+    final isDelivered = status == 'delivered';
+    final isCancelled = status == 'cancelled';
+    
+    Color getStatusColor() {
+      if (isPending) return Colors.orange;
+      if (isConfirmed) return Colors.blue;
+      if (isPreparing) return Colors.purple;
+      if (isReady) return Colors.cyan;
+      if (isDelivered) return Colors.green;
+      if (isCancelled) return Colors.red;
+      return Colors.grey;
+    }
+
+    final statusColor = getStatusColor();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.05),
+            blurRadius: 5,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                order.orderNumber ?? 'Order',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  status.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: statusColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...items.map((item) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('${item.quantity}x ${item.name}'),
+                Text(Formatters.currencyFormat(item.price * item.quantity)),
+              ],
+            ),
+          )),
+          const Divider(),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Total',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text(
+                Formatters.currencyFormat(total),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Color(0xFF0A1A2B),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.person_outline, size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Customer: $customer',
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on, size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      order.deliveryAddress ?? 'No address',
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (isPending) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isUpdating ? null : () => _updateOrderStatus(order.id, 'confirmed'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0A1A2B),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: _isUpdating
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('Accept Order'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _isUpdating ? null : () => _updateOrderStatus(order.id, 'cancelled'),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.red),
+                      foregroundColor: Colors.red,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: _isUpdating
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('Reject'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (isConfirmed) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isUpdating ? null : () => _updateOrderStatus(order.id, 'preparing'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: _isUpdating
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('Start Preparing'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _isUpdating ? null : () => _updateOrderStatus(order.id, 'cancelled'),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.red),
+                      foregroundColor: Colors.red,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: _isUpdating
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('Cancel'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (isPreparing) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isUpdating ? null : () => _updateOrderStatus(order.id, 'ready'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: _isUpdating
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('Mark Ready'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (isReady) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue),
+                  SizedBox(width: 8),
+                  Text(
+                    'Waiting for driver pickup',
+                    style: TextStyle(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (isDelivered) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.check_circle, color: Colors.green),
+                  SizedBox(width: 8),
+                  Text(
+                    'Order Completed',
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (isCancelled) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.cancel, color: Colors.red),
+                  SizedBox(width: 8),
+                  Text(
+                    'Order Cancelled',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateOrderStatus(dynamic orderId, String newStatus) async {
+    if (_isUpdating) return;
+    
+    setState(() => _isUpdating = true);
+
+    try {
+      final apiService = ApiService();
+      
+      int orderIdInt = 0;
+      if (orderId is int) {
+        orderIdInt = orderId;
+      } else if (orderId is String) {
+        orderIdInt = int.tryParse(orderId) ?? 0;
+      }
+      
+      if (orderIdInt == 0) {
+        throw Exception('Invalid order ID: $orderId');
+      }
+
+      print('📝 Updating order $orderIdInt to status: $newStatus');
+      
+      final response = await apiService.updateOrderStatus(orderIdInt, newStatus);
+
+      print('📝 Update order response: $response');
+
+      if (response['success'] == true) {
+        await _loadOrders();
+        
+        String message = _getStatusDisplay(newStatus);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Order $message!'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ ${response['error'] ?? 'Failed to update order'}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Error updating order: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdating = false);
+      }
+    }
+  }
+
+  String _getStatusDisplay(String status) {
+    final map = {
+      'confirmed': 'Accepted',
+      'preparing': 'Started Preparing',
+      'ready': 'Marked Ready',
+      'cancelled': 'Cancelled',
+      'delivered': 'Delivered',
+    };
+    return map[status] ?? status;
+  }
+}
+
 // ==================== SHOP PROFILE TAB ====================
 class ShopProfileTab extends StatefulWidget {
   const ShopProfileTab({Key? key}) : super(key: key);
@@ -743,6 +1280,7 @@ class _ShopProfileTabState extends State<ShopProfileTab> {
   late TextEditingController _districtController;
   late TextEditingController _wardController;
   late TextEditingController _sloganController;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -779,6 +1317,7 @@ class _ShopProfileTabState extends State<ShopProfileTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Store Header
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -840,6 +1379,7 @@ class _ShopProfileTabState extends State<ShopProfileTab> {
             ),
             const SizedBox(height: 16),
 
+            // Stats Row
             Row(
               children: [
                 _buildShopStat('${productProvider.products.length}', 'Products'),
@@ -849,6 +1389,7 @@ class _ShopProfileTabState extends State<ShopProfileTab> {
             ),
             const SizedBox(height: 16),
 
+            // Shop Information - Editable Form
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -872,12 +1413,102 @@ class _ShopProfileTabState extends State<ShopProfileTab> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  _buildInfoRow('Store Name', _storeNameController.text),
-                  _buildInfoRow('Contact Phone', _phoneController.text),
-                  _buildInfoRow('Address', _addressController.text),
-                  _buildInfoRow('District', _districtController.text),
-                  _buildInfoRow('Ward / Area', _wardController.text),
-                  _buildInfoRow('Slogan', _sloganController.text),
+                  Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        TextFormField(
+                          controller: _storeNameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Store Name',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          validator: (value) => value!.isEmpty ? 'Required' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _phoneController,
+                          decoration: const InputDecoration(
+                            labelText: 'Contact Phone',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          keyboardType: TextInputType.phone,
+                          validator: (value) => value!.isEmpty ? 'Required' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _addressController,
+                          decoration: const InputDecoration(
+                            labelText: 'Address',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          validator: (value) => value!.isEmpty ? 'Required' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _districtController,
+                          decoration: const InputDecoration(
+                            labelText: 'District',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          validator: (value) => value!.isEmpty ? 'Required' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _wardController,
+                          decoration: const InputDecoration(
+                            labelText: 'Ward / Area',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          validator: (value) => value!.isEmpty ? 'Required' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _sloganController,
+                          decoration: const InputDecoration(
+                            labelText: 'Business Slogan',
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _isSaving ? null : _saveShopDetails,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0A1A2B),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: _isSaving
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(
+                                    'SAVE SHOP DETAILS',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
@@ -973,33 +1604,51 @@ class _ShopProfileTabState extends State<ShopProfileTab> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade600,
-              ),
-            ),
+  Future<void> _saveShopDetails() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final user = Provider.of<AuthProvider>(context, listen: false).user;
+      
+      final updateData = {
+        'store_name': _storeNameController.text,
+        'phone_number': _phoneController.text,
+        'location': _addressController.text,
+        'address': _addressController.text,
+      };
+
+      final response = await ApiService().updateStore(updateData);
+      
+      print('Update store response: $response');
+
+      if (response['success'] == true) {
+        await Provider.of<AuthProvider>(context, listen: false).loadUser();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Shop details saved successfully!'),
+            backgroundColor: Colors.green,
           ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ ${response['error'] ?? 'Failed to save shop details'}'),
+            backgroundColor: Colors.red,
           ),
-        ],
-      ),
-    );
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() => _isSaving = false);
+    }
   }
 }

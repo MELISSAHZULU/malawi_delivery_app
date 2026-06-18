@@ -14,11 +14,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadNotifications();
-  }
-
-  Future<void> _loadNotifications() async {
-    await Provider.of<NotificationProvider>(context, listen: false).fetchNotifications();
+    // Fetch notifications when screen opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<NotificationProvider>(context, listen: false).fetchNotifications();
+    });
   }
 
   @override
@@ -33,7 +32,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         actions: [
           if (notificationProvider.unreadCount > 0)
             TextButton(
-              onPressed: notificationProvider.isLoading ? null : () => _markAllRead(),
+              onPressed: notificationProvider.isLoading ? null : () => _markAllRead(context),
               child: const Text('Mark all read'),
             ),
         ],
@@ -63,97 +62,99 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     ],
                   ),
                 )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: notificationProvider.notifications.length,
-                  itemBuilder: (context, index) {
-                    final notification = notificationProvider.notifications[index];
-                    final isRead = notification['is_read'] ?? false;
-                    final type = notification['type'] ?? 'system';
-                    
-                    return GestureDetector(
-                      onTap: () {
-                        if (!isRead) {
-                          notificationProvider.markAsRead(notification['id']);
-                        }
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: isRead ? Colors.white : Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isRead ? Colors.grey.shade200 : Colors.blue.shade200,
+              : RefreshIndicator(
+                  onRefresh: () => notificationProvider.fetchNotifications(),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: notificationProvider.notifications.length,
+                    itemBuilder: (context, index) {
+                      final notification = notificationProvider.notifications[index];
+                      final isRead = notification['is_read'] ?? false;
+                      final type = notification['type'] ?? 'system';
+                      
+                      return GestureDetector(
+                        onTap: () {
+                          if (!isRead) {
+                            notificationProvider.markAsRead(notification['id']);
+                          }
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isRead ? Colors.white : Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isRead ? Colors.grey.shade200 : Colors.blue.shade200,
+                            ),
                           ),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: _getIconColor(type).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(
-                                _getIcon(type),
-                                color: _getIconColor(type),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    notification['title'] ?? 'Notification',
-                                    style: TextStyle(
-                                      fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    notification['message'] ?? '',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.grey.shade700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    notification['time_ago'] ?? '',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey.shade500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (!isRead)
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: Colors.blue,
-                                  shape: BoxShape.circle,
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: _getIconColor(type).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  _getIcon(type),
+                                  color: _getIconColor(type),
                                 ),
                               ),
-                          ],
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      notification['title'] ?? 'Notification',
+                                      style: TextStyle(
+                                        fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      notification['message'] ?? '',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.grey.shade700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      notification['time_ago'] ?? '',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (!isRead)
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.blue,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
     );
   }
 
-  Future<void> _markAllRead() async {
+  Future<void> _markAllRead(BuildContext context) async {
     await Provider.of<NotificationProvider>(context, listen: false).markAllAsRead();
-    await _loadNotifications();
   }
 
   IconData _getIcon(String type) {

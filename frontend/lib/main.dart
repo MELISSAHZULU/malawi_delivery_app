@@ -6,6 +6,7 @@ import 'providers/cart_provider.dart';
 import 'providers/order_provider.dart';
 import 'providers/product_provider.dart';
 import 'providers/offline_queue_provider.dart';
+import 'providers/notification_provider.dart';
 import 'routes/app_routes.dart';
 import 'routes/app_navigator.dart';
 import 'utils/app_theme.dart';
@@ -35,6 +36,9 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider<ProductProvider>(create: (_) => ProductProvider()),
         ChangeNotifierProvider<OfflineQueueProvider>(
           create: (_) => OfflineQueueProvider(),
+        ),
+        ChangeNotifierProvider<NotificationProvider>(
+          create: (_) => NotificationProvider(),
         ),
       ],
       child: MaterialApp(
