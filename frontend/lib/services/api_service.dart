@@ -485,6 +485,128 @@ class ApiService {
     }
   }
 
+  // ============ NOTIFICATIONS ============
+  Future<Map<String, dynamic>> getNotifications() async {
+    try {
+      final token = await _storage.read(key: 'access_token');
+      
+      if (token == null) {
+        return {'success': false, 'error': 'Not authenticated'};
+      }
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/notifications/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('Get notifications status: ${response.statusCode}');
+      print('Get notifications body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': json.decode(response.body)};
+      }
+      return {'success': false, 'error': 'Failed to fetch notifications'};
+    } catch (e) {
+      print('Get notifications error: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> markNotificationRead(int notificationId) async {
+    try {
+      final token = await _storage.read(key: 'access_token');
+      
+      if (token == null) {
+        return {'success': false, 'error': 'Not authenticated'};
+      }
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/notifications/$notificationId/mark-read/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('Mark notification read status: ${response.statusCode}');
+      print('Mark notification read body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': json.decode(response.body)};
+      }
+      return {'success': false, 'error': 'Failed to mark notification as read'};
+    } catch (e) {
+      print('Mark notification read error: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> markAllNotificationsRead() async {
+    try {
+      final token = await _storage.read(key: 'access_token');
+      
+      if (token == null) {
+        return {'success': false, 'error': 'Not authenticated'};
+      }
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/notifications/mark-all-read/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('Mark all notifications read status: ${response.statusCode}');
+      print('Mark all notifications read body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': json.decode(response.body)};
+      }
+      return {'success': false, 'error': 'Failed to mark all as read'};
+    } catch (e) {
+      print('Mark all notifications read error: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  // ============ PAYMENTS ============
+  Future<Map<String, dynamic>> getPaymentStatus(String orderId) async {
+    try {
+      final token = await _storage.read(key: 'access_token');
+      
+      if (token == null) {
+        return {'success': false, 'error': 'Not authenticated'};
+      }
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/payments/status/$orderId/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('Get payment status: ${response.statusCode}');
+      print('Get payment status body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': json.decode(response.body)};
+      }
+      return {'success': false, 'error': 'Failed to get payment status'};
+    } catch (e) {
+      print('Get payment status error: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
   Future<void> logout() async {
     await _storage.deleteAll();
   }

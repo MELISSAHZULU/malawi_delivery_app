@@ -66,7 +66,7 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
               ),
             ),
             Text(
-              'Welcome back, ${user?.username ?? 'Seller'} 🦋',
+              'Happy Shopping, ${user?.username ?? 'Seller'}! 🛍️',
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -126,13 +126,6 @@ class _DashboardTabState extends State<DashboardTab> {
     ]);
   }
 
-  String _getGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  }
-
   @override
   Widget build(BuildContext context) {
     final productProvider = Provider.of<ProductProvider>(context);
@@ -154,15 +147,6 @@ class _DashboardTabState extends State<DashboardTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '${_getGreeting()}, ${user?.username ?? 'Seller'}! 🐱',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF0A1A2B),
-              ),
-            ),
-            const SizedBox(height: 4),
             Text(
               "Here's how your shop is doing",
               style: TextStyle(
@@ -235,9 +219,8 @@ class _DashboardTabState extends State<DashboardTab> {
                       Expanded(
                         child: OutlinedButton(
                           onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Transaction history coming soon!')),
-                            );
+                            // Navigate to Order History
+                            Navigator.pushNamed(context, AppRoutes.orderHistory);
                           },
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.white,

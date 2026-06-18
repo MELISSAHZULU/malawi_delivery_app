@@ -10,6 +10,7 @@ import json
 from .models import Order, OrderTracking
 from .serializers import OrderSerializer, OrderCreateSerializer, OrderTrackingSerializer
 from accounts.models import BuyerProfile, SellerProfile
+from notifications.models import Notification
 
 class OrderListView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
@@ -26,7 +27,6 @@ class OrderListView(generics.ListCreateAPIView):
         if user.role == 'buyer':
             queryset = Order.objects.filter(buyer__user=user).order_by('-created_at')
         elif user.role == 'seller':
-            # Filter orders where the seller is the logged-in user
             queryset = Order.objects.filter(seller__user=user).order_by('-created_at')
         elif user.role == 'driver':
             queryset = Order.objects.filter(driver=user).order_by('-created_at')
@@ -100,6 +100,15 @@ class OrderListView(generics.ListCreateAPIView):
                 note='Order placed'
             )
             
+            # Create notification for seller
+            Notification.objects.create(
+                user=seller.user,
+                title=f"New Order: {order.order_number}",
+                message=f"New order #{order.order_number} has been placed by {buyer.user.username}.",
+                type='order',
+                data={'order_id': order.id, 'order_number': order.order_number}
+            )
+            
             return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
             
         except Exception as e:
@@ -122,6 +131,30 @@ class OrderDetailView(generics.RetrieveUpdateDestroyAPIView):
         elif user.role == 'driver':
             return Order.objects.filter(driver=user)
         return Order.objects.none()
+    
+    def destroy(self, request, *args, **kwargs):
+        order = self.get_object()
+        # Only allow cancellation, not hard delete
+        order.status = 'cancelled'
+        order.save()
+        
+        # Create tracking entry
+        OrderTracking.objects.create(
+            order=order,
+            status='cancelled',
+            note='Order cancelled'
+        )
+        
+        # Create notification for buyer
+        Notification.objects.create(
+            user=order.buyer.user,
+            title=f"Order Cancelled: {order.order_number}",
+            message=f"Your order {order.order_number} has been cancelled.",
+            type='order',
+            data={'order_id': order.id, 'order_number': order.order_number}
+        )
+        
+        return Response({'message': 'Order cancelled successfully'}, status=status.HTTP_200_OK)
 
 class OrderTrackingView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
@@ -143,43 +176,89 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
         return Order.objects.all()
     
     def update(self, request, *args, **kwargs):
-        order = self.get_object()
-        new_status = request.data.get('status')
-        location = request.data.get('location', {})
-        note = request.data.get('note', '')
-        
-        if not new_status:
+        try:
+            order = self.get_object()
+            new_status = request.data.get('status')
+            location = request.data.get('location', {})
+            note = request.data.get('note', '')
+            
+            print(f"📝 Updating order {order.id} to status: {new_status}")
+            
+            if not new_status:
+                return Response(
+                    {'error': 'Status is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if user has permission
+            user = request.user
+            if user.role == 'seller' and order.seller.user != user:
+                return Response(
+                    {'error': 'Not authorized to update this order'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            elif user.role == 'driver' and order.driver != user:
+                return Response(
+                    {'error': 'Not authorized to update this order'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Update order status
+            old_status = order.status
+            order.status = new_status
+            order.save()
+            
+            # Create tracking entry
+            OrderTracking.objects.create(
+                order=order,
+                status=new_status,
+                location=location,
+                note=note or f'Order status updated to {new_status}'
+            )
+            
+            print(f"✅ Order {order.id} updated from {old_status} to {new_status}")
+            
+            # Create notifications based on status change
+            status_messages = {
+                'confirmed': 'has been accepted',
+                'preparing': 'is being prepared',
+                'ready': 'is ready for pickup',
+                'picked_up': 'has been picked up',
+                'driving': 'is on the way',
+                'arrived': 'has arrived',
+                'delivered': 'has been delivered',
+                'cancelled': 'has been cancelled'
+            }
+            
+            action = status_messages.get(new_status, f'has been updated to {new_status}')
+            
+            # Notify buyer
+            Notification.objects.create(
+                user=order.buyer.user,
+                title=f"Order {new_status.capitalize()}: {order.order_number}",
+                message=f"Your order {order.order_number} {action}.",
+                type='order',
+                data={'order_id': order.id, 'order_number': order.order_number}
+            )
+            
+            # Notify seller (if different from buyer)
+            if order.seller.user != order.buyer.user:
+                Notification.objects.create(
+                    user=order.seller.user,
+                    title=f"Order {new_status.capitalize()}: {order.order_number}",
+                    message=f"Order {order.order_number} {action}.",
+                    type='order',
+                    data={'order_id': order.id, 'order_number': order.order_number}
+                )
+            
+            return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            print(f"❌ Error updating order status: {e}")
             return Response(
-                {'error': 'Status is required'},
+                {'error': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        # Check if user has permission
-        user = request.user
-        if user.role == 'seller' and order.seller.user != user:
-            return Response(
-                {'error': 'Not authorized to update this order'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        elif user.role == 'driver' and order.driver != user:
-            return Response(
-                {'error': 'Not authorized to update this order'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        # Update order status
-        order.status = new_status
-        order.save()
-        
-        # Create tracking entry
-        OrderTracking.objects.create(
-            order=order,
-            status=new_status,
-            location=location,
-            note=note
-        )
-        
-        return Response(OrderSerializer(order).data)
 
 class WeeklyEarningsView(APIView):
     permission_classes = [IsAuthenticated]
