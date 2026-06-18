@@ -4,7 +4,6 @@ import '../../providers/cart_provider.dart';
 import '../../providers/offline_queue_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../widgets/product_card.dart';
-import '../../widgets/category_chip.dart';
 import '../../widgets/offline_banner.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/formatters.dart';
@@ -21,6 +20,15 @@ class _HomeScreenState extends State<HomeScreen> {
   String _selectedCategory = 'ALL ITEMS';
   final TextEditingController _searchController = TextEditingController();
 
+  // Category mapping for filtering
+  final Map<String, List<String>> _categoryMap = {
+    'ALL ITEMS': ['FOOD', 'GROCERY', 'CRAFTS', 'MARKET'],
+    'FOOD': ['FOOD'],
+    'GROCERY': ['GROCERY'],
+    'CRAFTS': ['CRAFTS'],
+    'MARKET': ['MARKET'],
+  };
+
   @override
   void initState() {
     super.initState();
@@ -36,6 +44,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final cartProvider = Provider.of<CartProvider>(context);
     final offlineProvider = Provider.of<OfflineQueueProvider>(context);
     final productProvider = Provider.of<ProductProvider>(context);
+
+    // Apply category filter
+    final filteredProducts = _getFilteredProducts(productProvider.products);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -61,9 +72,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 16),
                       _buildCategories(),
                       const SizedBox(height: 16),
-                      _buildFeaturedItems(productProvider, cartProvider),
+                      _buildFeaturedItems(filteredProducts, cartProvider),
                       const SizedBox(height: 16),
-                      _buildProductsGrid(productProvider, cartProvider),
+                      _buildProductsGrid(filteredProducts, cartProvider),
                       const SizedBox(height: 80),
                     ],
                   ),
@@ -102,6 +113,17 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
     );
+  }
+
+  List<dynamic> _getFilteredProducts(List<dynamic> products) {
+    if (_selectedCategory == 'ALL ITEMS') {
+      return products;
+    }
+    final categoryNames = _categoryMap[_selectedCategory] ?? [];
+    return products.where((product) {
+      final productCategory = product.categoryName?.toUpperCase() ?? '';
+      return categoryNames.contains(productCategory);
+    }).toList();
   }
 
   Widget _buildHeader(CartProvider cartProvider) {
@@ -171,6 +193,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildLocationGreeting() {
+    final hour = DateTime.now().hour;
+    String greeting;
+    if (hour < 12) {
+      greeting = 'Good morning';
+    } else if (hour < 17) {
+      greeting = 'Good afternoon';
+    } else {
+      greeting = 'Good evening';
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -189,9 +221,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         const SizedBox(height: 4),
-        const Text(
-          'Good afternoon, 🦋',
-          style: TextStyle(
+        Text(
+          '$greeting, 🦋',
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
             color: Color(0xFF0A1A2B),
@@ -316,7 +348,6 @@ class _HomeScreenState extends State<HomeScreen> {
               setState(() {
                 _selectedCategory = categories[index];
               });
-              Provider.of<ProductProvider>(context, listen: false).filterByCategory(categories[index]);
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -346,8 +377,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildFeaturedItems(ProductProvider productProvider, CartProvider cartProvider) {
-    final featured = productProvider.products.where((p) => p.isPremium).take(2).toList();
+  Widget _buildFeaturedItems(List<dynamic> products, CartProvider cartProvider) {
+    final featured = products.where((p) => p.isPremium).take(2).toList();
 
     if (featured.isEmpty) {
       return const SizedBox.shrink();
@@ -368,7 +399,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             Text(
-              '${productProvider.products.length} items',
+              '${products.length} items',
               style: TextStyle(
                 fontSize: 13,
                 color: Colors.grey.shade600,
@@ -518,38 +549,15 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildProductsGrid(ProductProvider productProvider, CartProvider cartProvider) {
-    if (productProvider.isLoading) {
+  Widget _buildProductsGrid(List<dynamic> products, CartProvider cartProvider) {
+    if (Provider.of<ProductProvider>(context).isLoading) {
       return const Padding(
         padding: EdgeInsets.all(32.0),
         child: Center(child: CircularProgressIndicator()),
       );
     }
 
-    if (productProvider.error != null) {
-      return Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Center(
-          child: Column(
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.red),
-              const SizedBox(height: 16),
-              Text(
-                'Error loading products',
-                style: TextStyle(color: Colors.grey.shade600),
-              ),
-              const SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: _loadProducts,
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (productProvider.products.isEmpty) {
+    if (products.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(32.0),
         child: Center(
@@ -558,7 +566,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Icon(Icons.inventory_2, size: 48, color: Colors.grey.shade400),
               const SizedBox(height: 16),
               Text(
-                'No products available',
+                'No products in this category',
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey.shade600,
@@ -579,9 +587,9 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
-      itemCount: productProvider.products.length,
+      itemCount: products.length,
       itemBuilder: (context, index) {
-        final product = productProvider.products[index];
+        final product = products[index];
         return ProductCard(
           name: product.name,
           price: product.price,

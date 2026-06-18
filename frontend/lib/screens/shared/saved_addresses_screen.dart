@@ -11,7 +11,7 @@ class SavedAddressesScreen extends StatefulWidget {
 
 class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
   List<Map<String, dynamic>> _addresses = [];
-  bool _isLoading = false;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -22,32 +22,41 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
   Future<void> _loadAddresses() async {
     setState(() => _isLoading = true);
     
-    // Get addresses from user profile
-    final user = Provider.of<AuthProvider>(context, listen: false).user;
-    if (user != null && user.deliveryAddresses.isNotEmpty) {
-      _addresses = user.deliveryAddresses.map((addr) {
-        return {
-          'id': DateTime.now().millisecondsSinceEpoch + _addresses.length,
-          'address': addr,
-          'isDefault': _addresses.isEmpty,
-        };
-      }).toList();
-    } else {
-      // Sample data for demo
-      _addresses = [
-        {
-          'id': 1,
-          'address': 'Area 18, Lilongwe',
-          'details': 'Opposite Shoprite',
-          'isDefault': true,
-        },
-        {
-          'id': 2,
-          'address': 'City Center, Lilongwe',
-          'details': 'Office 456, Capital Tower',
-          'isDefault': false,
-        },
-      ];
+    try {
+      // Get addresses from user profile
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.loadUser();
+      final user = authProvider.user;
+      
+      if (user != null && user.deliveryAddresses.isNotEmpty) {
+        _addresses = user.deliveryAddresses.asMap().entries.map((entry) {
+          return {
+            'id': entry.key + 1,
+            'address': entry.value,
+            'details': '',
+            'isDefault': entry.key == 0,
+          };
+        }).toList();
+      } else {
+        // Sample data for demo
+        _addresses = [
+          {
+            'id': 1,
+            'address': 'Area 18, Lilongwe',
+            'details': 'Opposite Shoprite',
+            'isDefault': true,
+          },
+          {
+            'id': 2,
+            'address': 'City Center, Lilongwe',
+            'details': 'Office 456, Capital Tower',
+            'isDefault': false,
+          },
+        ];
+      }
+    } catch (e) {
+      print('Error loading addresses: $e');
+      _addresses = [];
     }
     
     setState(() => _isLoading = false);
@@ -116,7 +125,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
                           ),
                         ),
                         title: Text(
-                          address['address'],
+                          address['address'] ?? 'Unknown',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         subtitle: Column(
@@ -233,7 +242,7 @@ class _SavedAddressesScreenState extends State<SavedAddressesScreen> {
 
   void _showEditAddressDialog(BuildContext context, int index) {
     final address = _addresses[index];
-    final addressController = TextEditingController(text: address['address']);
+    final addressController = TextEditingController(text: address['address'] ?? '');
     final detailsController = TextEditingController(text: address['details'] ?? '');
 
     showDialog(
