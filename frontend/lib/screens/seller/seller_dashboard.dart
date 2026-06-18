@@ -118,7 +118,7 @@ class _DashboardTabState extends State<DashboardTab> {
     final orderProvider = Provider.of<OrderProvider>(context, listen: false);
     
     await Future.wait([
-      productProvider.fetchProducts(),
+      productProvider.fetchSellerProducts(),
       orderProvider.fetchOrders(),
     ]);
   }
@@ -131,7 +131,12 @@ class _DashboardTabState extends State<DashboardTab> {
 
     final productCount = productProvider.products.length;
     final totalOrders = orderProvider.orders.length;
-    final avgRating = 4.7; // Mock for now
+    final pendingOrders = orderProvider.orders.where((o) => o.status == 'pending').length;
+    final completedOrders = orderProvider.orders.where((o) => o.status == 'delivered').length;
+    
+    final totalEarnings = orderProvider.orders
+        .where((o) => o.status == 'delivered')
+        .fold(0.0, (sum, o) => sum + o.total);
 
     return RefreshIndicator(
       onRefresh: _loadData,
@@ -140,7 +145,6 @@ class _DashboardTabState extends State<DashboardTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Subtitle
             const Text(
               "Here's how your shop is doing",
               style: TextStyle(
@@ -173,7 +177,7 @@ class _DashboardTabState extends State<DashboardTab> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'MK 139,700',
+                    Formatters.currencyFormat(totalEarnings),
                     style: const TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
@@ -182,7 +186,7 @@ class _DashboardTabState extends State<DashboardTab> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Weekly earnings · Updated just now',
+                    'Total earnings from completed orders',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.white60,
@@ -231,13 +235,13 @@ class _DashboardTabState extends State<DashboardTab> {
             Row(
               children: [
                 _buildStatCard('$productCount', 'Products', Icons.inventory_2, Colors.blue),
-                _buildStatCard('$totalOrders', 'Orders Today', Icons.shopping_bag, Colors.orange),
-                _buildStatCard('$avgRating★', 'Avg Rating', Icons.star, Colors.amber),
+                _buildStatCard('$totalOrders', 'Orders', Icons.shopping_bag, Colors.orange),
+                _buildStatCard('${pendingOrders > 0 ? pendingOrders : 0}', 'Pending', Icons.pending, Colors.red),
               ],
             ),
             const SizedBox(height: 16),
 
-            // Weekly Earnings Chart
+            // Recent Orders
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -253,35 +257,42 @@ class _DashboardTabState extends State<DashboardTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Weekly Earnings',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'MK 139,700',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0A1A2B),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildChartBar(30, 'Mon'),
-                      _buildChartBar(45, 'Tue'),
-                      _buildChartBar(60, 'Wed'),
-                      _buildChartBar(80, 'Thu'),
-                      _buildChartBar(70, 'Fri'),
-                      _buildChartBar(90, 'Sat'),
-                      _buildChartBar(50, 'Sun'),
+                      const Text(
+                        'Recent Orders',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          final state = context.findAncestorStateOfType<_SellerDashboardScreenState>();
+                          if (state != null) {
+                            state.setState(() {
+                              state._currentIndex = 2;
+                            });
+                          }
+                        },
+                        child: const Text('View all'),
+                      ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  if (orderProvider.orders.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Center(
+                        child: Text(
+                          'No orders yet',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                    )
+                  else
+                    ...orderProvider.orders.take(3).map((order) => _buildRecentOrderCard(order)),
                 ],
               ),
             ),
@@ -322,71 +333,21 @@ class _DashboardTabState extends State<DashboardTab> {
                           },
                         ),
                       ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Recent Orders
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.05),
-                    blurRadius: 5,
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Recent Orders',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: _buildQuickAction(
+                          'View Orders',
+                          Icons.shopping_bag,
+                          () {
+                            final state = context.findAncestorStateOfType<_SellerDashboardScreenState>();
+                            if (state != null) {
+                              state.setState(() {
+                                state._currentIndex = 2;
+                              });
+                            }
+                          },
                         ),
                       ),
-                      TextButton(
-                        onPressed: () {
-                          // Switch to Orders tab
-                          final state = context.findAncestorStateOfType<_SellerDashboardScreenState>();
-                          if (state != null) {
-                            state.setState(() {
-                              state._currentIndex = 2;
-                            });
-                          }
-                        },
-                        child: const Text('View all'),
-                      ),
                     ],
-                  ),
-                  const SizedBox(height: 8),
-                  _buildRecentOrderCard(
-                    'MWD-84721',
-                    'Chisomo B.',
-                    'Nsima × 2',
-                    'MK 5,000',
-                  ),
-                  _buildRecentOrderCard(
-                    'MWD-84715',
-                    'Grace M.',
-                    'Grilled Chicken × 1',
-                    'MK 4,000',
-                  ),
-                  _buildRecentOrderCard(
-                    'MWD-84698',
-                    'James K.',
-                    'Vegetable Soup × 3',
-                    'MK 5,400',
                   ),
                 ],
               ),
@@ -438,26 +399,51 @@ class _DashboardTabState extends State<DashboardTab> {
     );
   }
 
-  Widget _buildChartBar(double height, String label) {
-    return Column(
-      children: [
-        Container(
-          height: height,
-          width: 24,
-          decoration: BoxDecoration(
-            color: const Color(0xFF2A7DE1),
-            borderRadius: BorderRadius.circular(4),
-          ),
+  Widget _buildRecentOrderCard(dynamic order) {
+    final items = order.items ?? [];
+    final total = order.total ?? 0;
+    final customer = order.buyerName ?? 'Customer';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Colors.grey, width: 0.5),
         ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            color: Colors.grey.shade600,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  order.orderNumber ?? 'Order',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  '$customer · ${items.isNotEmpty ? '${items.length} items' : 'No items'}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+          Text(
+            Formatters.currencyFormat(total),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: Color(0xFF0A1A2B),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -465,6 +451,7 @@ class _DashboardTabState extends State<DashboardTab> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
           color: Colors.blue.shade50,
@@ -488,50 +475,6 @@ class _DashboardTabState extends State<DashboardTab> {
       ),
     );
   }
-
-  Widget _buildRecentOrderCard(String orderId, String customer, String items, String amount) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Colors.grey, width: 0.5),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  orderId,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-                Text(
-                  '$customer · $items',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            amount,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-              color: Color(0xFF0A1A2B),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // ==================== PRODUCTS TAB ====================
@@ -544,6 +487,16 @@ class ProductsTab extends StatefulWidget {
 
 class _ProductsTabState extends State<ProductsTab> {
   @override
+  void initState() {
+    super.initState();
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    await Provider.of<ProductProvider>(context, listen: false).fetchSellerProducts();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final productProvider = Provider.of<ProductProvider>(context);
     final products = productProvider.products;
@@ -551,7 +504,7 @@ class _ProductsTabState extends State<ProductsTab> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: RefreshIndicator(
-        onRefresh: () => productProvider.fetchProducts(),
+        onRefresh: _loadProducts,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -560,9 +513,9 @@ class _ProductsTabState extends State<ProductsTab> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
+                  const Text(
                     'Merchandise',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
@@ -577,7 +530,9 @@ class _ProductsTabState extends State<ProductsTab> {
                 ],
               ),
               const SizedBox(height: 16),
-              if (products.isEmpty)
+              if (productProvider.isLoading)
+                const Center(child: CircularProgressIndicator())
+              else if (products.isEmpty)
                 Container(
                   padding: const EdgeInsets.all(32),
                   decoration: BoxDecoration(
@@ -592,6 +547,11 @@ class _ProductsTabState extends State<ProductsTab> {
                         Text(
                           'No products yet',
                           style: TextStyle(color: Colors.grey),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Add your first product',
+                          style: TextStyle(color: Colors.grey, fontSize: 12),
                         ),
                       ],
                     ),
@@ -727,80 +687,90 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
   String _selectedFilter = 'All';
 
   @override
+  void initState() {
+    super.initState();
+    _loadOrders();
+  }
+
+  Future<void> _loadOrders() async {
+    await Provider.of<OrderProvider>(context, listen: false).fetchOrders();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final orderProvider = Provider.of<OrderProvider>(context);
+    final orders = orderProvider.orders;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Orders Feed',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+      body: RefreshIndicator(
+        onRefresh: _loadOrders,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Orders Feed',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Manage incoming customer orders',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
+              const SizedBox(height: 4),
+              const Text(
+                'Manage incoming customer orders',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            // Filter chips
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildFilterChip('All'),
-                  _buildFilterChip('New'),
-                  _buildFilterChip('Preparing'),
-                  _buildFilterChip('Ready'),
-                  _buildFilterChip('Done'),
-                ],
+              const SizedBox(height: 16),
+              // Filter chips
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildFilterChip('All'),
+                    _buildFilterChip('Pending'),
+                    _buildFilterChip('Confirmed'),
+                    _buildFilterChip('Preparing'),
+                    _buildFilterChip('Delivered'),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            // Active Order Card
-            _buildOrderCard(
-              orderId: 'MWD-84721',
-              time: '2 min ago',
-              status: 'New Order',
-              statusColor: Colors.blue,
-              items: [
-                {'name': 'Nsima & Ndiwo Special × 2', 'price': 'MK 5,000'},
-                {'name': 'Mandazi Pack × 1', 'price': 'MK 1,500'},
-              ],
-              total: 'MK 6,500',
-              customer: 'Chisomo Banda',
-              location: 'Area 18, Lilongwe',
-              driver: 'Joseph Phiri',
-              driverPhone: '+265 88 456 7890',
-              showActions: true,
-            ),
-            const SizedBox(height: 16),
-            // Completed Order Card
-            _buildOrderCard(
-              orderId: 'MWD-84698',
-              time: '45 min ago',
-              status: 'Completed',
-              statusColor: Colors.green,
-              items: [
-                {'name': 'Vegetable Soup × 3', 'price': 'MK 5,400'},
-              ],
-              total: 'MK 6,900',
-              customer: 'James Kamanga',
-              location: 'Bwalo la Nichito, Blantyre',
-              driver: 'Mary Chirwa',
-              driverPhone: '+265 99 678 9012',
-              showActions: false,
-              isCompleted: true,
-            ),
-          ],
+              const SizedBox(height: 16),
+              if (orderProvider.isLoading)
+                const Center(child: CircularProgressIndicator())
+              else if (orders.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: Column(
+                      children: [
+                        Icon(Icons.shopping_bag_outlined, size: 48, color: Colors.grey),
+                        SizedBox(height: 8),
+                        Text(
+                          'No orders yet',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Orders from customers will appear here',
+                          style: TextStyle(color: Colors.grey, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                ...orders.map((order) => _buildOrderCard(order)),
+            ],
+          ),
         ),
       ),
     );
@@ -809,7 +779,10 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
   Widget _buildFilterChip(String label) {
     final isSelected = _selectedFilter == label;
     return GestureDetector(
-      onTap: () => setState(() => _selectedFilter = label),
+      onTap: () {
+        setState(() => _selectedFilter = label);
+        // TODO: Filter orders by status
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         margin: const EdgeInsets.only(right: 8),
@@ -831,21 +804,16 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
     );
   }
 
-  Widget _buildOrderCard({
-    required String orderId,
-    required String time,
-    required String status,
-    required Color statusColor,
-    required List<Map<String, String>> items,
-    required String total,
-    required String customer,
-    required String location,
-    required String driver,
-    required String driverPhone,
-    required bool showActions,
-    bool isCompleted = false,
-  }) {
+  Widget _buildOrderCard(dynamic order) {
+    final items = order.items ?? [];
+    final total = order.total ?? 0;
+    final customer = order.buyerName ?? 'Customer';
+    final status = order.status ?? 'pending';
+    final isPending = status == 'pending' || status == 'confirmed';
+    final statusColor = isPending ? Colors.orange : (status == 'delivered' ? Colors.green : Colors.blue);
+
     return Container(
+      margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -864,38 +832,26 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                orderId,
+                order.orderNumber ?? 'Order',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),
               ),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      status,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: statusColor,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  status.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: statusColor,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    time,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ],
           ),
@@ -905,8 +861,8 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(item['name']!),
-                Text(item['price']!),
+                Text('${item.quantity}x ${item.name}'),
+                Text(Formatters.currencyFormat(item.price * item.quantity)),
               ],
             ),
           )),
@@ -919,7 +875,7 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               Text(
-                total,
+                Formatters.currencyFormat(total),
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
@@ -953,31 +909,35 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
                     const Icon(Icons.location_on, size: 16),
                     const SizedBox(width: 4),
                     Text(
-                      location,
+                      order.deliveryAddress ?? 'No address',
                       style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.delivery_dining, size: 16),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Driver: $driver · $driverPhone',
-                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-                    ),
-                  ],
-                ),
+                if (order.driverName != null) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.delivery_dining, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Driver: ${order.driverName}',
+                        style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
-          if (showActions) ...[
+          if (isPending) ...[
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: () {
+                  _updateOrderStatus(order.id, 'confirmed');
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0A1A2B),
                   padding: const EdgeInsets.symmetric(vertical: 12),
@@ -985,30 +945,34 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                child: const Text('Accept & Prepare'),
-              ),
-            ),
-          ],
-          if (isCompleted) ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text('Mark Ready'),
+                child: const Text('Accept Order'),
               ),
             ),
           ],
         ],
       ),
     );
+  }
+
+  Future<void> _updateOrderStatus(String orderId, String status) async {
+    try {
+      final orderProvider = Provider.of<OrderProvider>(context, listen: false);
+      // TODO: Implement status update API
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Order ${status == 'confirmed' ? 'accepted' : 'updated'}!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      await _loadOrders();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }
 
@@ -1024,7 +988,7 @@ class _ShopProfileTabState extends State<ShopProfileTab> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _storeNameController;
   late TextEditingController _phoneController;
-  late TextEditingController _stallIdController;
+  late TextEditingController _addressController;
   late TextEditingController _districtController;
   late TextEditingController _wardController;
   late TextEditingController _sloganController;
@@ -1033,19 +997,19 @@ class _ShopProfileTabState extends State<ShopProfileTab> {
   void initState() {
     super.initState();
     final user = Provider.of<AuthProvider>(context, listen: false).user;
-    _storeNameController = TextEditingController(text: user?.storeName ?? 'Mama Grace Kitchen');
-    _phoneController = TextEditingController(text: user?.phoneNumber ?? '+265 99 876 5432');
-    _stallIdController = TextEditingController(text: 'LLW-F-042');
+    _storeNameController = TextEditingController(text: user?.storeName ?? '');
+    _phoneController = TextEditingController(text: user?.phoneNumber ?? '');
+    _addressController = TextEditingController(text: user?.location ?? '');
     _districtController = TextEditingController(text: 'Lilongwe');
     _wardController = TextEditingController(text: 'Area 18');
-    _sloganController = TextEditingController(text: 'Home-cooked goodness, delivered fresh!');
+    _sloganController = TextEditingController(text: '');
   }
 
   @override
   void dispose() {
     _storeNameController.dispose();
     _phoneController.dispose();
-    _stallIdController.dispose();
+    _addressController.dispose();
     _districtController.dispose();
     _wardController.dispose();
     _sloganController.dispose();
@@ -1064,7 +1028,6 @@ class _ShopProfileTabState extends State<ShopProfileTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Store Header
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -1104,14 +1067,6 @@ class _ShopProfileTabState extends State<ShopProfileTab> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        Text(
-                          'Home-cooked goodness, delivered fresh!',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
                         Row(
                           children: [
                             const Icon(Icons.verified, size: 16, color: Colors.green),
@@ -1122,21 +1077,6 @@ class _ShopProfileTabState extends State<ShopProfileTab> {
                                 fontSize: 12,
                                 color: Colors.green,
                                 fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade200,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                _stallIdController.text,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey.shade600,
-                                ),
                               ),
                             ),
                           ],
@@ -1153,8 +1093,8 @@ class _ShopProfileTabState extends State<ShopProfileTab> {
             Row(
               children: [
                 _buildShopStat('${productProvider.products.length}', 'Products'),
-                _buildShopStat('127', 'Completed'),
-                _buildShopStat('4.7★', 'Rating'),
+                _buildShopStat('${orderProvider.orders.length}', 'Orders'),
+                _buildShopStat('${orderProvider.orders.where((o) => o.status == 'delivered').length}', 'Completed'),
               ],
             ),
             const SizedBox(height: 16),
@@ -1194,10 +1134,10 @@ class _ShopProfileTabState extends State<ShopProfileTab> {
                   const SizedBox(height: 12),
                   _buildInfoRow('Store Name', _storeNameController.text),
                   _buildInfoRow('Contact Phone', _phoneController.text),
-                  _buildInfoRow('Stall ID', _stallIdController.text),
+                  _buildInfoRow('Address', _addressController.text),
                   _buildInfoRow('District', _districtController.text),
                   _buildInfoRow('Ward / Area', _wardController.text),
-                  _buildInfoRow('Business Slogan', _sloganController.text),
+                  _buildInfoRow('Slogan', _sloganController.text),
                   const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
