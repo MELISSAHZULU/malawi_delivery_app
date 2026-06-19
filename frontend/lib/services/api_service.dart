@@ -607,6 +607,134 @@ class ApiService {
     }
   }
 
+  // ============ DRIVER ============
+  Future<Map<String, dynamic>> getDriverOrders() async {
+    try {
+      final token = await _storage.read(key: 'access_token');
+      
+      if (token == null) {
+        return {'success': false, 'error': 'Not authenticated'};
+      }
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/delivery/orders/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('Get driver orders status: ${response.statusCode}');
+      print('Get driver orders body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': json.decode(response.body)};
+      }
+      return {'success': false, 'error': 'Failed to fetch driver orders'};
+    } catch (e) {
+      print('Get driver orders error: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateDeliveryStatus(String orderId, String action) async {
+    try {
+      final token = await _storage.read(key: 'access_token');
+      
+      if (token == null) {
+        return {'success': false, 'error': 'Not authenticated'};
+      }
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/delivery/orders/$orderId/status/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({'action': action}),
+      );
+
+      print('Update delivery status response: ${response.statusCode}');
+      print('Update delivery status body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': json.decode(response.body)};
+      }
+      return {'success': false, 'error': 'Failed to update delivery status'};
+    } catch (e) {
+      print('Update delivery status error: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  // ============ DELIVERY ============
+  Future<Map<String, dynamic>> assignDriver(int orderId, int driverId) async {
+    try {
+      final token = await _storage.read(key: 'access_token');
+      
+      if (token == null) {
+        return {'success': false, 'error': 'Not authenticated'};
+      }
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/delivery/assign/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({
+          'order_id': orderId,
+          'driver_id': driverId,
+        }),
+      );
+
+      print('Assign driver response: ${response.statusCode}');
+      print('Assign driver body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': json.decode(response.body)};
+      }
+      return {'success': false, 'error': 'Failed to assign driver'};
+    } catch (e) {
+      print('Assign driver error: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> autoAssignDriver(int orderId) async {
+    try {
+      final token = await _storage.read(key: 'access_token');
+      
+      if (token == null) {
+        return {'success': false, 'error': 'Not authenticated'};
+      }
+      
+      final response = await http.post(
+        Uri.parse('$baseUrl/delivery/auto-assign/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({'order_id': orderId}),
+      );
+
+      print('Auto assign driver response: ${response.statusCode}');
+      print('Auto assign driver body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': json.decode(response.body)};
+      }
+      return {'success': false, 'error': 'Failed to auto-assign driver'};
+    } catch (e) {
+      print('Auto assign driver error: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
   Future<void> logout() async {
     await _storage.deleteAll();
   }

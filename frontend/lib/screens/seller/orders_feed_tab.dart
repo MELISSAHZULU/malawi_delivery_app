@@ -67,6 +67,7 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
                         _buildFilterChip('Pending'),
                         _buildFilterChip('Confirmed'),
                         _buildFilterChip('Preparing'),
+                        _buildFilterChip('Ready'),
                         _buildFilterChip('Delivered'),
                         _buildFilterChip('Cancelled'),
                       ],
@@ -173,6 +174,7 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
     final isReady = status == 'ready';
     final isDelivered = status == 'delivered';
     final isCancelled = status == 'cancelled';
+    final hasDriver = order.driverName != null && order.driverName != '';
     
     Color getStatusColor() {
       if (isPending) return Colors.orange;
@@ -288,10 +290,103 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
                     ),
                   ],
                 ),
+                // ============================================
+                // DRIVER INFO - SELLER CAN SEE THIS
+                // ============================================
+                if (hasDriver) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.delivery_dining, size: 16, color: Colors.blue),
+                            SizedBox(width: 4),
+                            Text(
+                              'ASSIGNED DRIVER',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.person, size: 14, color: Colors.grey),
+                            const SizedBox(width: 4),
+                            Text(
+                              order.driverName ?? 'Unknown',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            const Icon(Icons.phone, size: 14, color: Colors.grey),
+                            const SizedBox(width: 4),
+                            Text(
+                              order.driverPhone ?? 'N/A',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (order.driverVehicle != null) ...[
+                          Row(
+                            children: [
+                              const Icon(Icons.directions_car, size: 14, color: Colors.grey),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${order.driverVehicle} • ${order.driverPlate ?? ''}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (order.driverRating != null) ...[
+                          Row(
+                            children: [
+                              const Icon(Icons.star, size: 14, color: Colors.amber),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${order.driverRating} ★',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
-          // Action buttons based on status
+          // ============================================
+          // ACTION BUTTONS BASED ON STATUS
+          // ============================================
           if (isPending) ...[
             const SizedBox(height: 12),
             Row(
@@ -388,7 +483,31 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
               ),
             ),
           ],
-          if (isReady) ...[
+          if (isReady && !hasDriver) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.hourglass_empty, color: Colors.orange),
+                  SizedBox(width: 8),
+                  Text(
+                    'Waiting for driver assignment...',
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (isReady && hasDriver) ...[
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(8),
@@ -399,10 +518,10 @@ class _OrdersFeedTabState extends State<OrdersFeedTab> {
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.info_outline, color: Colors.blue),
+                  Icon(Icons.delivery_dining, color: Colors.blue),
                   SizedBox(width: 8),
                   Text(
-                    'Waiting for driver pickup',
+                    'Driver assigned - On the way to pickup',
                     style: TextStyle(
                       color: Colors.blue,
                       fontWeight: FontWeight.bold,

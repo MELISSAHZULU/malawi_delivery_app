@@ -7,10 +7,12 @@ from django.utils import timezone
 from django.db import models
 from datetime import timedelta
 import json
+import random
 from .models import Order, OrderTracking
 from .serializers import OrderSerializer, OrderCreateSerializer, OrderTrackingSerializer
-from accounts.models import BuyerProfile, SellerProfile
+from accounts.models import BuyerProfile, SellerProfile, User, DriverProfile
 from notifications.models import Notification
+from delivery.models import DeliveryAssignment
 
 class OrderListView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
@@ -39,19 +41,17 @@ class OrderListView(generics.ListCreateAPIView):
     def create(self, request, *args, **kwargs):
         try:
             print("Creating order...")
-            print("Request data:", request.data)
             
             # Get buyer profile
             try:
                 buyer = BuyerProfile.objects.get(user=request.user)
-                print(f"Buyer found: {buyer.user.username}")
             except BuyerProfile.DoesNotExist:
                 return Response(
                     {'error': 'Buyer profile not found'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Get seller - use first available seller or from request
+            # Get seller
             seller_id = request.data.get('seller_id')
             if seller_id:
                 try:
@@ -62,15 +62,12 @@ class OrderListView(generics.ListCreateAPIView):
                         status=status.HTTP_400_BAD_REQUEST
                     )
             else:
-                # Use first available seller (for testing)
                 seller = SellerProfile.objects.first()
                 if not seller:
                     return Response(
                         {'error': 'No seller available'},
                         status=status.HTTP_400_BAD_REQUEST
                     )
-            
-            print(f"Seller: {seller.store_name}")
             
             # Generate order number
             import random
@@ -91,8 +88,6 @@ class OrderListView(generics.ListCreateAPIView):
                 payment_status='pending',
             )
             
-            print(f"Order created: {order.order_number}")
-            
             # Create tracking entry
             OrderTracking.objects.create(
                 order=order,
@@ -100,7 +95,7 @@ class OrderListView(generics.ListCreateAPIView):
                 note='Order placed'
             )
             
-            # Create notification for seller
+            # Notify seller
             Notification.objects.create(
                 user=seller.user,
                 title=f"New Order: {order.order_number}",
@@ -134,18 +129,15 @@ class OrderDetailView(generics.RetrieveUpdateDestroyAPIView):
     
     def destroy(self, request, *args, **kwargs):
         order = self.get_object()
-        # Only allow cancellation, not hard delete
         order.status = 'cancelled'
         order.save()
         
-        # Create tracking entry
         OrderTracking.objects.create(
             order=order,
             status='cancelled',
             note='Order cancelled'
         )
         
-        # Create notification for buyer
         Notification.objects.create(
             user=order.buyer.user,
             title=f"Order Cancelled: {order.order_number}",
@@ -179,8 +171,6 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
         try:
             order = self.get_object()
             new_status = request.data.get('status')
-            location = request.data.get('location', {})
-            note = request.data.get('note', '')
             
             print(f"📝 Updating order {order.id} to status: {new_status}")
             
@@ -190,14 +180,9 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Check if user has permission
+            # Check permission
             user = request.user
             if user.role == 'seller' and order.seller.user != user:
-                return Response(
-                    {'error': 'Not authorized to update this order'},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            elif user.role == 'driver' and order.driver != user:
                 return Response(
                     {'error': 'Not authorized to update this order'},
                     status=status.HTTP_403_FORBIDDEN
@@ -212,13 +197,12 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
             OrderTracking.objects.create(
                 order=order,
                 status=new_status,
-                location=location,
-                note=note or f'Order status updated to {new_status}'
+                note=f'Order status updated to {new_status}'
             )
             
             print(f"✅ Order {order.id} updated from {old_status} to {new_status}")
             
-            # Create notifications based on status change
+            # Create notifications
             status_messages = {
                 'confirmed': 'has been accepted',
                 'preparing': 'is being prepared',
@@ -241,7 +225,7 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
                 data={'order_id': order.id, 'order_number': order.order_number}
             )
             
-            # Notify seller (if different from buyer)
+            # Notify seller
             if order.seller.user != order.buyer.user:
                 Notification.objects.create(
                     user=order.seller.user,
@@ -250,6 +234,111 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
                     type='order',
                     data={'order_id': order.id, 'order_number': order.order_number}
                 )
+            
+            # ============================================
+            # AUTO-ASSIGN DRIVER WHEN ORDER IS READY
+            # ============================================
+            if new_status == 'ready':
+                print(f"🔍 Order {order.order_number} is ready! Finding a driver...")
+                
+                # Find available drivers
+                available_drivers = DriverProfile.objects.filter(
+                    is_available=True,
+                    is_verified=True,
+                    user__is_active=True
+                )
+                
+                if available_drivers.exists():
+                    # Select a random available driver
+                    driver_profile = random.choice(available_drivers)
+                    driver_user = driver_profile.user
+                    
+                    print(f"✅ Assigning driver: {driver_user.username}")
+                    
+                    # Create delivery assignment
+                    assignment = DeliveryAssignment.objects.create(
+                        order=order,
+                        driver=driver_user,
+                        status='accepted'
+                    )
+                    
+                    # Update order with driver
+                    order.driver = driver_user
+                    order.status = 'picked_up'  # Auto-advance to picked_up
+                    order.save()
+                    
+                    print(f"✅ Driver {driver_user.username} assigned to order {order.order_number}")
+                    
+                    # Notify driver
+                    Notification.objects.create(
+                        user=driver_user,
+                        title=f"New Delivery: {order.order_number}",
+                        message=f"You have been assigned to deliver order #{order.order_number}. Pickup from {order.seller.store_name}.",
+                        type='delivery',
+                        data={
+                            'order_id': order.id,
+                            'order_number': order.order_number,
+                            'pickup_address': order.seller.address,
+                            'dropoff_address': order.delivery_address,
+                            'total': float(order.total),
+                            'driver_id': driver_user.id
+                        }
+                    )
+                    
+                    # Notify seller that driver is assigned
+                    Notification.objects.create(
+                        user=order.seller.user,
+                        title=f"Driver Assigned: {order.order_number}",
+                        message=f"Driver {driver_user.username} has been assigned to deliver order #{order.order_number}.",
+                        type='delivery',
+                        data={
+                            'order_id': order.id,
+                            'order_number': order.order_number,
+                            'driver_name': driver_user.username,
+                            'driver_phone': driver_user.phone_number,
+                            'driver_vehicle': driver_profile.vehicle_type,
+                            'driver_plate': driver_profile.vehicle_plate
+                        }
+                    )
+                    
+                    # Notify buyer
+                    Notification.objects.create(
+                        user=order.buyer.user,
+                        title=f"Driver Assigned: {order.order_number}",
+                        message=f"Your order #{order.order_number} is being delivered by {driver_user.username}.",
+                        type='delivery',
+                        data={
+                            'order_id': order.id,
+                            'order_number': order.order_number,
+                            'driver_name': driver_user.username,
+                            'driver_phone': driver_user.phone_number,
+                            'driver_vehicle': driver_profile.vehicle_type,
+                            'driver_plate': driver_profile.vehicle_plate
+                        }
+                    )
+                    
+                    return Response({
+                        'order': OrderSerializer(order).data,
+                        'driver_assigned': True,
+                        'driver': {
+                            'name': driver_user.username,
+                            'phone': driver_user.phone_number,
+                            'vehicle': driver_profile.vehicle_type,
+                            'plate': driver_profile.vehicle_plate,
+                            'rating': driver_profile.rating
+                        }
+                    }, status=status.HTTP_200_OK)
+                    
+                else:
+                    print(f"⚠️ No drivers available for order {order.order_number}")
+                    # Notify seller that no drivers are available
+                    Notification.objects.create(
+                        user=order.seller.user,
+                        title=f"No Driver Available: {order.order_number}",
+                        message=f"No drivers are currently available for order #{order.order_number}. Please wait.",
+                        type='system',
+                        data={'order_id': order.id, 'order_number': order.order_number}
+                    )
             
             return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
             
@@ -271,11 +360,9 @@ class WeeklyEarningsView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # Get last 7 days
         end_date = timezone.now()
         start_date = end_date - timedelta(days=7)
         
-        # Get completed orders for this seller
         orders = Order.objects.filter(
             seller__user=user,
             status='delivered',
@@ -283,7 +370,6 @@ class WeeklyEarningsView(APIView):
             created_at__lte=end_date
         )
         
-        # Calculate daily earnings
         daily_earnings = {}
         weekdays = []
         for i in range(7):
@@ -293,10 +379,8 @@ class WeeklyEarningsView(APIView):
             daily_earnings[day.strftime('%a')] = float(day_total)
             weekdays.append(day.strftime('%a'))
         
-        # Calculate total earnings
         total_earnings = sum(daily_earnings.values())
         
-        # Get wallet balance
         wallet_balance = 0
         if hasattr(user, 'seller_profile') and hasattr(user.seller_profile, 'wallet'):
             wallet_balance = float(user.seller_profile.wallet.balance)

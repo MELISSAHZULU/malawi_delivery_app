@@ -4,6 +4,7 @@ import '../../providers/auth_provider.dart';
 import '../../models/user.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/formatters.dart';
+import 'driver_deliveries_screen.dart';
 
 class DriverDashboard extends StatefulWidget {
   const DriverDashboard({Key? key}) : super(key: key);
@@ -27,20 +28,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
           children: [
             _buildHeader(user),
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildEarningsCard(),
-                    const SizedBox(height: 16),
-                    _buildStatsRow(),
-                    const SizedBox(height: 16),
-                    _buildAssignedDeliveries(),
-                    const SizedBox(height: 16),
-                  ],
-                ),
-              ),
+              child: _currentIndex == 0
+                  ? _buildDashboardContent()
+                  : const DriverDeliveriesScreen(),
             ),
           ],
         ),
@@ -65,12 +55,10 @@ class _DriverDashboardState extends State<DriverDashboard> {
           ),
         ],
         onTap: (index) {
-          setState(() => _currentIndex = index);
-          if (index == 0) {
-            // Already on dashboard
-          } else if (index == 1) {
-            // Navigate to deliveries
-          } else if (index == 2) {
+          setState(() {
+            _currentIndex = index;
+          });
+          if (index == 2) {
             Navigator.pushNamed(context, AppRoutes.profile);
           }
         },
@@ -136,93 +124,139 @@ class _DriverDashboardState extends State<DriverDashboard> {
     );
   }
 
-  Widget _buildEarningsCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0A1A2B), Color(0xFF1A2C3F)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-      ),
+  Widget _buildDashboardContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Today\'s Earnings',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.white70,
-            ),
-          ),
-          const SizedBox(height: 8),
+          // Stats Row
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'MK 14,500',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.green,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text(
-                  '+12% vs yesterday',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
+              _buildStatCard('342', 'Total Deliveries', Icons.delivery_dining, Colors.blue),
+              _buildStatCard('4.9★', 'Avg Rating', Icons.star, Colors.amber),
+              _buildStatCard('MK 82K', 'This Week', Icons.attach_money, Colors.green),
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatItem('6 Deliveries', Icons.delivery_dining),
-              _buildStatItem('4.5 Hours', Icons.access_time),
-              _buildStatItem('38 km', Icons.route),
-            ],
+
+          // Today's Earnings
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF0A1A2B), Color(0xFF1A2C3F)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Today's Earnings",
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white70,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'MK 14,500',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        '+12% vs yesterday',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildStatItem('6 Deliveries', Icons.delivery_dining),
+                    _buildStatItem('4.5 Hours', Icons.access_time),
+                    _buildStatItem('38 km', Icons.route),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Quick Actions
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.05),
+                  blurRadius: 5,
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Quick Actions',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildQuickAction(
+                        'View Deliveries',
+                        Icons.delivery_dining,
+                        () {
+                          setState(() {
+                            _currentIndex = 1;
+                          });
+                        },
+                      ),
+                    ),
+                    Expanded(
+                      child: _buildQuickAction(
+                        'Profile',
+                        Icons.person,
+                        () {
+                          Navigator.pushNamed(context, AppRoutes.profile);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildStatItem(String label, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, color: Colors.white70, size: 16),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.white70,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatsRow() {
-    return Row(
-      children: [
-        _buildStatCard('342', 'Total Deliveries', Icons.delivery_dining, Colors.blue),
-        _buildStatCard('4.9★', 'Avg Rating', Icons.star, Colors.amber),
-        _buildStatCard('MK 82K', 'This Week', Icons.attach_money, Colors.green),
-      ],
     );
   }
 
@@ -266,190 +300,44 @@ class _DriverDashboardState extends State<DriverDashboard> {
     );
   }
 
-  Widget _buildAssignedDeliveries() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildStatItem(String label, IconData icon) {
+    return Row(
       children: [
-        const Text(
-          'Assigned Deliveries',
+        Icon(icon, color: Colors.white70, size: 16),
+        const SizedBox(width: 4),
+        Text(
+          label,
           style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            color: Colors.white70,
           ),
-        ),
-        const SizedBox(height: 12),
-        _buildDeliveryCard(
-          status: 'ACTIVE',
-          id: 'MWD-84721',
-          amount: 'MK 2,500',
-          items: 'Nsima × 2, Mandazi × 1',
-          pickup: 'Mama Grace Kitchen, Area 18',
-          dropoff: 'Area 23, Lilongwe',
-          distance: '3.2 km',
-          time: '12 min',
-          isActive: true,
-        ),
-        const SizedBox(height: 12),
-        _buildDeliveryCard(
-          status: 'PENDING',
-          id: 'MWD-84698',
-          amount: 'MK 3,500',
-          items: 'Grilled Tilapia × 1',
-          pickup: 'Lake View Grill, City Centre',
-          dropoff: 'Bwalo la Nichito',
-          distance: '5.8 km',
-          time: '25 min',
-          isActive: false,
         ),
       ],
     );
   }
 
-  Widget _buildDeliveryCard({
-    required String status,
-    required String id,
-    required String amount,
-    required String items,
-    required String pickup,
-    required String dropoff,
-    required String distance,
-    required String time,
-    required bool isActive,
-  }) {
+  Widget _buildQuickAction(String label, IconData icon, VoidCallback onTap) {
     return GestureDetector(
-      onTap: () {
-        Navigator.pushNamed(
-          context,
-          AppRoutes.deliveryDetail,
-          arguments: {'id': id},
-        );
-      },
+      onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isActive ? Colors.blue.shade200 : Colors.grey.shade200,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.05),
-              blurRadius: 5,
-            ),
-          ],
+          color: Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.blue.shade200),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isActive ? Colors.green : Colors.orange,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    status,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  amount,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0A1A2B),
-                  ),
-                ),
-              ],
-            ),
+            Icon(icon, color: const Color(0xFF2A7DE1), size: 24),
             const SizedBox(height: 4),
             Text(
-              id,
-              style: TextStyle(
-                fontSize: 14,
+              label,
+              style: const TextStyle(
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey.shade600,
+                color: Color(0xFF0A1A2B),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              items,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade700,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(Icons.location_on, size: 14, color: Color(0xFF2A7DE1)),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    pickup,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                const Icon(Icons.location_off, size: 14, color: Colors.red),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    dropoff,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.route, size: 16, color: Colors.grey.shade500),
-                const SizedBox(width: 4),
-                Text(
-                  distance,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Icon(Icons.access_time, size: 16, color: Colors.grey.shade500),
-                const SizedBox(width: 4),
-                Text(
-                  time,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                const Spacer(),
-                const Text(
-                  'View >',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF2A7DE1),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
             ),
           ],
         ),
