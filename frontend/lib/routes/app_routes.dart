@@ -17,6 +17,7 @@ class AppRoutes {
   static const String deliveries = '/deliveries';
   static const String deliveryDetail = '/delivery-detail';
   static const String driverProfile = '/driver-profile';
+  static const String driverTracking = '/driver-tracking';
   
   static const String profile = '/profile';
   static const String orders = '/orders';
