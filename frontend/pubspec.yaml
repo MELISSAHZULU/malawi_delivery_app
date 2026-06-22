@@ -26,6 +26,7 @@ dependencies:
 
   # Real-time
   web_socket_channel: ^2.4.0
+  
 
   # UI
   cached_network_image: ^3.3.0

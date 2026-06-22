@@ -90,13 +90,17 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
   }
 
   Widget _buildDeliveryCard(dynamic order) {
-    // Safely extract data with null checks
-    final List<dynamic> items = order.items ?? [];
-    final total = order.total ?? 0;
     final status = order.status ?? 'pending';
     final isDriving = status == 'driving' || status == 'picked_up';
     final isDelivered = status == 'delivered';
     final isPending = status == 'pending' || status == 'accepted' || status == 'confirmed';
+    
+    // Extract data with proper fallbacks
+    final storeName = order.sellerName ?? order.storeName ?? 'Store';
+    final storeAddress = order.sellerAddress ?? order.storeAddress ?? 'Pickup location';
+    final deliveryAddress = order.deliveryAddress ?? 'Delivery location';
+    final totalAmount = order.total ?? order.amount ?? 0;
+    final orderNumber = order.orderNumber ?? 'Order #${order.id ?? ''}';
     
     Color getStatusColor() {
       if (isDelivered) return Colors.green;
@@ -106,21 +110,39 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
     }
 
     String getStatusText() {
-      if (isDelivered) return 'DELIVERED';
-      if (isDriving) return 'IN PROGRESS';
-      if (isPending) return 'PENDING';
+      if (isDelivered) return 'Delivered';
+      if (isDriving) return 'In Progress';
+      if (isPending) return 'Ready for Pickup';
       return status.toUpperCase();
+    }
+
+    // Safely get distance
+    double distance = 0;
+    try {
+      distance = order.distance ?? 0;
+    } catch (e) {
+      distance = 0;
+    }
+
+    // Safely get items count
+    int itemCount = 0;
+    try {
+      if (order.items != null && order.items is List) {
+        itemCount = order.items.length;
+      }
+    } catch (e) {
+      itemCount = 0;
     }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.05),
-            blurRadius: 5,
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 10,
             offset: const Offset(0, 2),
           ),
         ],
@@ -128,43 +150,44 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
+          // Header with status badge
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
                   children: [
-                    Text(
-                      order.orderNumber ?? 'Order #${order.id ?? ''}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: getStatusColor(),
+                        shape: BoxShape.circle,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(width: 10),
                     Text(
-                      'Pickup: ${order.sellerName ?? 'Store'}',
+                      getStatusText(),
                       style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: getStatusColor(),
                       ),
                     ),
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: getStatusColor().withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    getStatusText(),
+                    orderNumber,
                     style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
                       color: getStatusColor(),
                     ),
                   ),
@@ -173,92 +196,222 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
             ),
           ),
 
-          // Items - FIXED: Added .cast<Widget>()
-          if (items.isNotEmpty) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                children: items.map((item) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '${item['quantity'] ?? 0}x ${item['name'] ?? 'Item'}',
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      ),
-                      Text(
-                        Formatters.currencyFormat(
-                          (item['price'] ?? 0) * (item['quantity'] ?? 0)
-                        ),
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                )).toList().cast<Widget>(), // ✅ CRITICAL FIX
-              ),
-            ),
-            const Divider(height: 16, thickness: 1),
-          ],
+          const Divider(height: 1, thickness: 1),
 
-          // Total
+          // Main content
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Total',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                Text(
-                  Formatters.currencyFormat(total),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: Color(0xFF0A1A2B),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Delivery Address
-          if (order.deliveryAddress != null && order.deliveryAddress.toString().isNotEmpty) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
+                // Store name with location
+                Row(
                   children: [
-                    const Icon(Icons.location_on, size: 16, color: Colors.grey),
-                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.storefront_outlined,
+                        size: 20,
+                        color: Colors.blue.shade700,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        order.deliveryAddress,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade700,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            storeName,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            storeAddress,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                // Delivery address
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.location_on_outlined,
+                        size: 20,
+                        color: Colors.green.shade700,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            deliveryAddress,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            'Delivery location',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // Distance and Amount row
+                Row(
+                  children: [
+                    // Distance
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.route_outlined,
+                              size: 16,
+                              color: Colors.grey.shade600,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              distance > 0 
+                                  ? '${distance.toStringAsFixed(1)} km' 
+                                  : 'Est. 2.5 km',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Amount
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.attach_money,
+                              size: 16,
+                              color: Colors.green.shade700,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              Formatters.currencyFormat(totalAmount),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green.shade700,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ],
                 ),
-              ),
+
+                // Items summary
+                if (itemCount > 0) ...[
+                  const SizedBox(height: 12),
+                  InkWell(
+                    onTap: () {
+                      Navigator.pushNamed(
+                        context,
+                        AppRoutes.deliveryDetail,
+                        arguments: {'id': order.id, 'order': order},
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.shopping_bag_outlined,
+                            size: 16,
+                            color: Colors.grey.shade600,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '$itemCount item${itemCount > 1 ? 's' : ''}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            'View details',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.blue.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right,
+                            size: 16,
+                            color: Colors.blue.shade600,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ],
+          ),
 
           // Action Buttons
           Padding(
@@ -270,13 +423,13 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                     child: ElevatedButton.icon(
                       onPressed: () => _showDeliveryCompleteDialog(context, order),
                       icon: const Icon(Icons.check_circle, size: 18),
-                      label: const Text('Mark Delivered'),
+                      label: const Text('Complete Delivery'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                     ),
@@ -286,13 +439,13 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                     child: ElevatedButton.icon(
                       onPressed: () => _showPickupDialog(context, order),
                       icon: const Icon(Icons.shopping_bag, size: 18),
-                      label: const Text('Pick Up'),
+                      label: const Text('Pick Up Order'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0A1A2B),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                     ),
@@ -300,22 +453,23 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                 ] else if (isDelivered) ...[
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                       decoration: BoxDecoration(
                         color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.green.shade200),
                       ),
                       child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.check_circle, color: Colors.green, size: 18),
+                          Icon(Icons.check_circle, color: Colors.green, size: 20),
                           SizedBox(width: 8),
                           Text(
                             'Completed',
                             style: TextStyle(
                               color: Colors.green,
                               fontWeight: FontWeight.bold,
+                              fontSize: 14,
                             ),
                           ),
                         ],
@@ -330,18 +484,20 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                       Navigator.pushNamed(
                         context,
                         AppRoutes.deliveryDetail,
-                        arguments: {'id': order.id},
+                        arguments: {'id': order.id, 'order': order},
                       );
                     },
-                    icon: const Icon(Icons.info_outline, size: 18),
+                    icon: const Icon(Icons.chevron_right, size: 18),
                     label: const Text('Details'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF0A1A2B),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      side: const BorderSide(color: Color(0xFF0A1A2B)),
+                      side: BorderSide(
+                        color: Colors.grey.shade300,
+                      ),
                     ),
                   ),
                 ),
@@ -357,12 +513,12 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Pick Up Order'),
+        title: const Text('Confirm Pickup'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Have you picked up the order from the seller?'),
+            const Text('Ready to pick up this order?'),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
@@ -374,12 +530,12 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Order: ${order.orderNumber ?? '#'}',
+                    '📍 ${order.sellerName ?? 'Store'}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Pickup: ${order.sellerName ?? 'Store'}',
+                    'Order: ${order.orderNumber ?? '#'}',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade600,
@@ -408,7 +564,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('✅ Order picked up!'),
+                      content: Text('✅ Order picked up successfully'),
                       backgroundColor: Colors.green,
                     ),
                   );
@@ -428,7 +584,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
               backgroundColor: const Color(0xFF0A1A2B),
               foregroundColor: Colors.white,
             ),
-            child: const Text('Picked Up'),
+            child: const Text('Pick Up'),
           ),
         ],
       ),
@@ -444,7 +600,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Have you delivered the order to the customer?'),
+            const Text('Confirm delivery completion?'),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
@@ -456,12 +612,12 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Order: ${order.orderNumber ?? '#'}',
+                    '📍 ${order.deliveryAddress ?? 'Delivery address'}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Delivery Address: ${order.deliveryAddress ?? 'N/A'}',
+                    'Order: ${order.orderNumber ?? '#'}',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey.shade600,
@@ -490,7 +646,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('✅ Delivery completed!'),
+                      content: Text('✅ Delivery completed successfully'),
                       backgroundColor: Colors.green,
                     ),
                   );
@@ -510,7 +666,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
               backgroundColor: Colors.green,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Delivered'),
+            child: const Text('Complete'),
           ),
         ],
       ),
