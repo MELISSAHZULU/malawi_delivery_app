@@ -35,10 +35,12 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
         title: const Text('My Deliveries'),
         backgroundColor: Colors.white,
         elevation: 0,
+        foregroundColor: Colors.black,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadDeliveries,
+            color: Colors.black,
           ),
         ],
       ),
@@ -49,7 +51,11 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.delivery_dining_outlined, size: 80, color: Colors.grey.shade400),
+                      Icon(
+                        Icons.delivery_dining_outlined, 
+                        size: 80, 
+                        color: Colors.grey.shade400
+                      ),
                       const SizedBox(height: 16),
                       Text(
                         'No deliveries assigned',
@@ -62,7 +68,9 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                       const SizedBox(height: 8),
                       Text(
                         'You\'ll see deliveries here when assigned',
-                        style: TextStyle(color: Colors.grey.shade500),
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                        ),
                       ),
                     ],
                   ),
@@ -82,7 +90,8 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
   }
 
   Widget _buildDeliveryCard(dynamic order) {
-    final items = order.items ?? [];
+    // Safely extract data with null checks
+    final List<dynamic> items = order.items ?? [];
     final total = order.total ?? 0;
     final status = order.status ?? 'pending';
     final isDriving = status == 'driving' || status == 'picked_up';
@@ -112,6 +121,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
           BoxShadow(
             color: Colors.grey.withOpacity(0.05),
             blurRadius: 5,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -128,12 +138,13 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      order.orderNumber ?? 'Order',
+                      order.orderNumber ?? 'Order #${order.id ?? ''}',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
                     ),
+                    const SizedBox(height: 4),
                     Text(
                       'Pickup: ${order.sellerName ?? 'Store'}',
                       style: TextStyle(
@@ -162,24 +173,38 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
             ),
           ),
 
-          // Items
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: items.map((item) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('${item.quantity}x ${item.name}'),
-                    Text(Formatters.currencyFormat(item.price * item.quantity)),
-                  ],
-                ),
-              )).toList(),
+          // Items - FIXED: Added .cast<Widget>()
+          if (items.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                children: items.map((item) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${item['quantity'] ?? 0}x ${item['name'] ?? 'Item'}',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                      Text(
+                        Formatters.currencyFormat(
+                          (item['price'] ?? 0) * (item['quantity'] ?? 0)
+                        ),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                )).toList().cast<Widget>(), // ✅ CRITICAL FIX
+              ),
             ),
-          ),
-
-          const Divider(),
+            const Divider(height: 16, thickness: 1),
+          ],
 
           // Total
           Padding(
@@ -207,31 +232,33 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
           ),
 
           // Delivery Address
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.location_on, size: 16, color: Colors.grey),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      order.deliveryAddress ?? 'No address',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade700,
+          if (order.deliveryAddress != null && order.deliveryAddress.toString().isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        order.deliveryAddress,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade700,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
+          ],
 
           // Action Buttons
           Padding(
@@ -242,10 +269,11 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () => _showDeliveryCompleteDialog(context, order),
-                      icon: const Icon(Icons.check_circle),
+                      icon: const Icon(Icons.check_circle, size: 18),
                       label: const Text('Mark Delivered'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -257,10 +285,11 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () => _showPickupDialog(context, order),
-                      icon: const Icon(Icons.shopping_bag),
+                      icon: const Icon(Icons.shopping_bag, size: 18),
                       label: const Text('Pick Up'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0A1A2B),
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -271,15 +300,16 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                 ] else if (isDelivered) ...[
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
                         color: Colors.green.shade50,
                         borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.green.shade200),
                       ),
                       child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.check_circle, color: Colors.green),
+                          Icon(Icons.check_circle, color: Colors.green, size: 18),
                           SizedBox(width: 8),
                           Text(
                             'Completed',
@@ -303,13 +333,15 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                         arguments: {'id': order.id},
                       );
                     },
-                    icon: const Icon(Icons.info_outline),
+                    icon: const Icon(Icons.info_outline, size: 18),
                     label: const Text('Details'),
                     style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF0A1A2B),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
+                      side: const BorderSide(color: Color(0xFF0A1A2B)),
                     ),
                   ),
                 ),
@@ -328,12 +360,33 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
         title: const Text('Pick Up Order'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Have you picked up the order from the seller?'),
-            const SizedBox(height: 8),
-            Text(
-              'Order: ${order.orderNumber ?? ''}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Order: ${order.orderNumber ?? '#'}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Pickup: ${order.sellerName ?? 'Store'}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -346,24 +399,35 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
             onPressed: () async {
               Navigator.pop(context);
               final driverProvider = Provider.of<DriverProvider>(context, listen: false);
-              final success = await driverProvider.updateDeliveryStatus(order.id.toString(), 'pick_up');
+              final success = await driverProvider.updateDeliveryStatus(
+                order.id.toString(), 
+                'pick_up'
+              );
               if (success) {
                 await _loadDeliveries();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('✅ Order picked up!'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ Order picked up!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('❌ ${driverProvider.error ?? 'Failed to update'}'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('❌ ${driverProvider.error ?? 'Failed to update'}'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
               }
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0A1A2B),
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Picked Up'),
           ),
         ],
@@ -378,17 +442,33 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
         title: const Text('Complete Delivery'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Have you delivered the order to the customer?'),
-            const SizedBox(height: 8),
-            Text(
-              'Order: ${order.orderNumber ?? ''}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Delivery Address: ${order.deliveryAddress ?? 'N/A'}',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Order: ${order.orderNumber ?? '#'}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Delivery Address: ${order.deliveryAddress ?? 'N/A'}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -401,24 +481,35 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
             onPressed: () async {
               Navigator.pop(context);
               final driverProvider = Provider.of<DriverProvider>(context, listen: false);
-              final success = await driverProvider.updateDeliveryStatus(order.id.toString(), 'deliver');
+              final success = await driverProvider.updateDeliveryStatus(
+                order.id.toString(), 
+                'deliver'
+              );
               if (success) {
                 await _loadDeliveries();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('✅ Delivery completed!'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ Delivery completed!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('❌ ${driverProvider.error ?? 'Failed to update'}'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('❌ ${driverProvider.error ?? 'Failed to update'}'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
               }
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Delivered'),
           ),
         ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/driver_provider.dart';
 import '../../models/user.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/formatters.dart';
@@ -17,8 +18,23 @@ class _DriverDashboardState extends State<DriverDashboard> {
   int _currentIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final driverProvider = Provider.of<DriverProvider>(context, listen: false);
+    await Future.wait([
+      driverProvider.fetchAssignedOrders(),
+      driverProvider.fetchAvailableOrders(),
+    ]);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
+    final driverProvider = Provider.of<DriverProvider>(context);
     final user = authProvider.user;
 
     return Scaffold(
@@ -26,10 +42,10 @@ class _DriverDashboardState extends State<DriverDashboard> {
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(user),
+            _buildHeader(user, driverProvider.assignedOrders.length),
             Expanded(
               child: _currentIndex == 0
-                  ? _buildDashboardContent()
+                  ? _buildDashboardContent(driverProvider)
                   : const DriverDeliveriesScreen(),
             ),
           ],
@@ -66,7 +82,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
     );
   }
 
-  Widget _buildHeader(User? user) {
+  Widget _buildHeader(User? user, int activeCount) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -106,10 +122,12 @@ class _DriverDashboardState extends State<DriverDashboard> {
                   ),
                 ),
                 Text(
-                  'Ready to deliver',
+                  activeCount > 0 
+                      ? '$activeCount active deliveries' 
+                      : 'Ready for new deliveries',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.green.shade600,
+                    color: activeCount > 0 ? Colors.green.shade600 : Colors.grey.shade600,
                   ),
                 ),
               ],
@@ -124,138 +142,217 @@ class _DriverDashboardState extends State<DriverDashboard> {
     );
   }
 
-  Widget _buildDashboardContent() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Stats Row
-          Row(
-            children: [
-              _buildStatCard('342', 'Total Deliveries', Icons.delivery_dining, Colors.blue),
-              _buildStatCard('4.9★', 'Avg Rating', Icons.star, Colors.amber),
-              _buildStatCard('MK 82K', 'This Week', Icons.attach_money, Colors.green),
-            ],
-          ),
-          const SizedBox(height: 16),
+  Widget _buildDashboardContent(DriverProvider driverProvider) {
+    final assignedOrders = driverProvider.assignedOrders;
+    final availableOrders = driverProvider.availableOrders;
+    final totalDeliveries = assignedOrders.length;
+    final deliveredCount = assignedOrders.where((o) => o.status == 'delivered').length;
+    final activeCount = assignedOrders.where((o) => o.status == 'driving' || o.status == 'picked_up').length;
 
-          // Today's Earnings
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0A1A2B), Color(0xFF1A2C3F)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    final totalEarnings = assignedOrders
+        .where((o) => o.status == 'delivered')
+        .fold(0.0, (sum, o) => sum + (o.total ?? 0));
+
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Stats Row
+            Row(
               children: [
-                const Text(
-                  "Today's Earnings",
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white70,
-                  ),
+                _buildStatCard(
+                  '$totalDeliveries', 
+                  'Total', 
+                  Icons.delivery_dining, 
+                  Colors.blue,
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'MK 14,500',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                _buildStatCard(
+                  '${totalDeliveries > 0 ? (deliveredCount / totalDeliveries * 100).toStringAsFixed(0) : 0}%', 
+                  'Completion', 
+                  Icons.percent, 
+                  Colors.green,
+                ),
+                _buildStatCard(
+                  activeCount > 0 ? '$activeCount' : '0', 
+                  'Active', 
+                  Icons.circle, 
+                  activeCount > 0 ? Colors.green : Colors.grey,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Earnings Card
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0A1A2B), Color(0xFF1A2C3F)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Total Earnings",
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.white70,
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        '+12% vs yesterday',
-                        style: TextStyle(
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        Formatters.currencyFormat(totalEarnings),
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
                           color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildStatItem('6 Deliveries', Icons.delivery_dining),
-                    _buildStatItem('4.5 Hours', Icons.access_time),
-                    _buildStatItem('38 km', Icons.route),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Quick Actions
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.05),
-                  blurRadius: 5,
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Quick Actions',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          deliveredCount > 0 ? '${deliveredCount} completed' : 'No deliveries',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildQuickAction(
-                        'View Deliveries',
-                        Icons.delivery_dining,
-                        () {
-                          setState(() {
-                            _currentIndex = 1;
-                          });
-                        },
-                      ),
-                    ),
-                    Expanded(
-                      child: _buildQuickAction(
-                        'Profile',
-                        Icons.person,
-                        () {
-                          Navigator.pushNamed(context, AppRoutes.profile);
-                        },
-                      ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildStatItem('$deliveredCount Delivered', Icons.check_circle),
+                      _buildStatItem('${assignedOrders.length - deliveredCount} Pending', Icons.pending),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Available Orders - Show orders ready for pickup
+            if (availableOrders.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.05),
+                      blurRadius: 5,
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-        ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.notifications_active, color: Colors.orange),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Available Orders',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.orange,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${availableOrders.length}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ...availableOrders.take(3).map((order) => _buildAvailableOrderCard(order)),
+                    if (availableOrders.length > 3)
+                      TextButton(
+                        onPressed: () {
+                          // Navigate to available orders list
+                        },
+                        child: const Text('View all available orders →'),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Assigned Deliveries
+            if (assignedOrders.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.05),
+                      blurRadius: 5,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'My Deliveries',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _currentIndex = 1;
+                            });
+                          },
+                          child: const Text('View all'),
+                        ),
+                      ],
+                    ),
+                    ...assignedOrders.take(3).map((order) => _buildDeliveryCard(order)),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -283,7 +380,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
               value,
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 14,
+                fontSize: 16,
               ),
             ),
             Text(
@@ -316,31 +413,165 @@ class _DriverDashboardState extends State<DriverDashboard> {
     );
   }
 
-  Widget _buildQuickAction(String label, IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: Colors.blue.shade50,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.blue.shade200),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: const Color(0xFF2A7DE1), size: 24),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF0A1A2B),
+  Widget _buildAvailableOrderCard(dynamic order) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                order.orderNumber ?? 'Order',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
               ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.orange,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'READY',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Pickup: ${order.sellerName ?? 'Store'}',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
             ),
-          ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Total: ${Formatters.currencyFormat(order.total ?? 0)}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final driverProvider = Provider.of<DriverProvider>(context, listen: false);
+                  final success = await driverProvider.acceptDelivery(int.parse(order.id));
+                  if (success) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('✅ Delivery accepted!'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                    await _loadData();
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('❌ ${driverProvider.error ?? 'Failed to accept'}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                ),
+                child: const Text(
+                  'Accept',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeliveryCard(dynamic order) {
+    final status = order.status ?? 'pending';
+    final isDelivered = status == 'delivered';
+    final isActive = status == 'driving' || status == 'picked_up';
+    
+    Color getStatusColor() {
+      if (isDelivered) return Colors.green;
+      if (isActive) return Colors.blue;
+      return Colors.orange;
+    }
+
+    String getStatusText() {
+      if (isDelivered) return 'Completed';
+      if (isActive) return 'In Progress';
+      return 'Pending';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Colors.grey, width: 0.5),
         ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: getStatusColor(),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  order.orderNumber ?? 'Order',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  getStatusText(),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: getStatusColor(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            Formatters.currencyFormat(order.total ?? 0),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: Color(0xFF0A1A2B),
+            ),
+          ),
+        ],
       ),
     );
   }
