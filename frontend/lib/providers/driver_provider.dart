@@ -28,15 +28,24 @@ class DriverProvider extends ChangeNotifier {
         if (data is List) {
           _assignedOrders = data.map((item) {
             try {
-              // Order data is nested inside order_details
               final orderDetails = item['order_details'] as Map<String, dynamic>?;
               if (orderDetails == null) return null;
+              // Inject the assignment id and status into order_details before parsing
+              orderDetails['assignment_id'] = item['id'].toString();
+              // Add assignment status if available
+              if (item['status'] != null) {
+                orderDetails['assignment_status'] = item['status'].toString();
+              }
+              // Add driver name if available
+              if (item['driver_name'] != null) {
+                orderDetails['driver_name'] = item['driver_name'].toString();
+              }
               return Order.fromJson(orderDetails);
-           }  catch (e) {
+            } catch (e) {
               print('Error parsing order: $e');
               return null;
-           }
-         }).whereType<Order>().toList();
+            }
+          }).whereType<Order>().toList();
           print('Driver orders loaded: ${_assignedOrders.length}');
         } else {
           _assignedOrders = [];
@@ -155,7 +164,54 @@ class DriverProvider extends ChangeNotifier {
     }
   }
 
+  // New method to get a single order by ID
+  Order? getOrderById(String id) {
+    try {
+      final results = _assignedOrders.where((order) => order.id.toString() == id);
+      return results.isNotEmpty ? results.first : null;
+    } catch (e) {
+      return null;
+   }
+ }
+
+  // New method to get order status
+  String getOrderStatus(String id) {
+    final order = getOrderById(id);
+    return order?.status ?? 'unknown';
+  }
+
+  // New method to check if order is in a specific state
+  bool isOrderPending(String id) {
+    final order = getOrderById(id);
+    if (order == null) return false;
+    final status = order.status.toLowerCase();
+    return status == 'pending' || status == 'accepted' || status == 'confirmed' || status == 'ready';
+  }
+
+  bool isOrderPickedUp(String id) {
+    final order = getOrderById(id);
+    if (order == null) return false;
+    final status = order.status.toLowerCase();
+    return status == 'picked_up' || status == 'in_transit' || status == 'driving';
+  }
+
+  bool isOrderDelivered(String id) {
+    final order = getOrderById(id);
+    if (order == null) return false;
+    final status = order.status.toLowerCase();
+    return status == 'delivered' || status == 'completed';
+  }
+
   void clearError() {
+    _error = null;
+    notifyListeners();
+  }
+
+  // Reset method for logout
+  void reset() {
+    _assignedOrders = [];
+    _availableOrders = [];
+    _isLoading = false;
     _error = null;
     notifyListeners();
   }

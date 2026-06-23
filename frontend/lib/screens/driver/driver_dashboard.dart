@@ -151,7 +151,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
 
     final totalEarnings = assignedOrders
         .where((o) => o.status == 'delivered')
-        .fold(0.0, (sum, o) => sum + (o.total ?? 0));
+        .fold(0.0, (sum, o) => sum + (o.deliveryFee ?? 0));
 
     return RefreshIndicator(
       onRefresh: _loadData,

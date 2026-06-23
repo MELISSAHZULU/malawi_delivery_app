@@ -33,14 +33,37 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     _loadOrderData();
   }
 
+  // ✅ UPDATED: Cleaner _loadOrderData method
   void _loadOrderData() {
     final args = ModalRoute.of(context)?.settings.arguments;
-    if (args is Map<String, dynamic>) {
+
+    // Handle different argument types
+    if (args is Map) {
       order = args['order'];
-      if (order != null) {
-        _setupLocations();
+    } else if (args != null) {
+      order = args;
+    }
+
+    // If order was passed as a String ID, fetch it from provider
+    if (order is String) {
+      final driverProvider = Provider.of<DriverProvider>(context, listen: false);
+      final results = driverProvider.assignedOrders
+          .where((o) => o.id.toString() == order);
+      if (results.isNotEmpty) {
+        order = results.first;
+        print('✅ Found order by ID: ${order.orderNumber}');
+      } else {
+        print('❌ Order not found with ID: $order');
       }
     }
+
+    if (order != null) {
+      _setupLocations();
+      print('✅ Order loaded: ${order.orderNumber}');
+    } else {
+      print('❌ Order is null after loading');
+    }
+
     _isLoading = false;
     setState(() {});
   }
@@ -157,17 +180,40 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : order == null
-              ? const Center(
+              ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.error_outline, size: 60, color: Colors.grey),
-                      SizedBox(height: 16),
+                      Icon(Icons.error_outline, size: 60, color: Colors.grey.shade400),
+                      const SizedBox(height: 16),
                       Text(
                         'Order not found',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Please go back and try again',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton.icon(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.arrow_back),
+                        label: const Text('Go Back'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0A1A2B),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
                     ],
@@ -394,20 +440,30 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
   }
 
   Widget _buildStatusHeader() {
-    final status = order.status ?? 'pending';
-    final isDriving = status == 'driving' || status == 'picked_up';
-    final isDelivered = status == 'delivered';
+    final status = order.status?.toLowerCase() ?? 'pending';
+    final isPickedUp = status == 'picked_up' || status == 'in_transit' || status == 'driving';
+    final isDelivered = status == 'delivered' || status == 'completed';
+    final isPending = status == 'pending' || status == 'accepted' || status == 'confirmed' || status == 'ready';
 
     String getHeaderText() {
       if (isDelivered) return 'Delivery Completed 🎉';
-      if (isDriving) return 'Head to Customer';
-      return 'Head to Pickup';
+      if (isPickedUp) return 'Head to Customer';
+      if (isPending) return 'Head to Pickup';
+      return 'Order Details';
     }
 
     Color getStatusColor() {
       if (isDelivered) return Colors.green;
-      if (isDriving) return Colors.blue;
-      return Colors.orange;
+      if (isPickedUp) return Colors.blue;
+      if (isPending) return Colors.orange;
+      return Colors.grey;
+    }
+
+    String getStatusDisplay() {
+      if (isDelivered) return 'DELIVERED';
+      if (isPickedUp) return 'IN PROGRESS';
+      if (isPending) return 'PENDING';
+      return status.toUpperCase();
     }
 
     return Row(
@@ -424,7 +480,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
-            order.status?.toUpperCase() ?? 'PENDING',
+            getStatusDisplay(),
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
@@ -498,11 +554,10 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
   }
 
   Widget _buildActionButtons() {
-    final status = order.status ?? 'pending';
-    final isDriving = status == 'driving' || status == 'picked_up';
-    final isPending =
-        status == 'pending' || status == 'accepted' || status == 'confirmed';
-    final isDelivered = status == 'delivered';
+    final status = order.status?.toLowerCase() ?? 'pending';
+    final isPickedUp = status == 'picked_up' || status == 'in_transit' || status == 'driving';
+    final isPending = status == 'pending' || status == 'accepted' || status == 'confirmed' || status == 'ready';
+    final isDelivered = status == 'delivered' || status == 'completed';
 
     if (isDelivered) {
       return Container(
@@ -527,12 +582,12 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
 
     return Row(
       children: [
-        if (isDriving)
+        if (isPickedUp)
           Expanded(
             child: ElevatedButton.icon(
               onPressed: _showCompleteDialog,
               icon: const Icon(Icons.check_circle),
-              label: const Text('Complete'),
+              label: const Text('Complete Delivery'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
@@ -547,7 +602,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
             child: ElevatedButton.icon(
               onPressed: _showPickupDialog,
               icon: const Icon(Icons.shopping_bag),
-              label: const Text('Pick Up'),
+              label: const Text('Pick Up Order'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0A1A2B),
                 foregroundColor: Colors.white,
@@ -577,6 +632,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     );
   }
 
+  // ✅ FIXED: _showPickupDialog with ScaffoldMessenger saved before async
   void _showPickupDialog() {
     showDialog(
       context: context,
@@ -587,7 +643,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Ready to pick up this order?'),
+              const Text('Ready to pick up this order from the seller?'),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -609,18 +665,31 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
+                // Close dialog
                 Navigator.pop(dialogContext);
+                
+                // Get provider
                 final driverProvider =
                     Provider.of<DriverProvider>(context, listen: false);
+                
+                // ✅ Save ScaffoldMessenger before async
+                final messenger = ScaffoldMessenger.of(context);
+                
+                // Perform async operation
                 final success = await driverProvider.updateDeliveryStatus(
-                    order.id.toString(), 'pick_up');
+                  order.id.toString(),
+                  'pick_up'
+                );
+                
+                // Use saved messenger for SnackBar
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(success ? '✅ Order picked up successfully' : '❌ ${driverProvider.error ?? 'Failed'}'),
+                    backgroundColor: success ? Colors.green : Colors.red,
+                  ),
+                );
+                
                 if (success && mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('✅ Order picked up successfully'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
                   setState(() {});
                 }
               },
@@ -636,6 +705,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     );
   }
 
+  // ✅ FIXED: _showCompleteDialog with ScaffoldMessenger saved before async
   void _showCompleteDialog() {
     showDialog(
       context: context,
@@ -646,7 +716,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Confirm delivery completion?'),
+              const Text('Confirm delivery to the customer?'),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -668,18 +738,31 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
+                // Close dialog
                 Navigator.pop(dialogContext);
+                
+                // Get provider
                 final driverProvider =
                     Provider.of<DriverProvider>(context, listen: false);
+                
+                // ✅ Save ScaffoldMessenger before async
+                final messenger = ScaffoldMessenger.of(context);
+                
+                // Perform async operation
                 final success = await driverProvider.updateDeliveryStatus(
-                    order.id.toString(), 'deliver');
+                  order.id.toString(),
+                  'deliver'
+                );
+                
+                // Use saved messenger for SnackBar
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(success ? '✅ Delivery completed successfully 🎉' : '❌ ${driverProvider.error ?? 'Failed'}'),
+                    backgroundColor: success ? Colors.green : Colors.red,
+                  ),
+                );
+                
                 if (success && mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('✅ Delivery completed successfully'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
                   setState(() {});
                 }
               },

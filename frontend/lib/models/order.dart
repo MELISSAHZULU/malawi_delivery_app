@@ -2,6 +2,7 @@ import 'cart_item.dart';
 
 class Order {
   final String id;
+  final String? assignmentId; // driver assignment id
   final String orderNumber;
   final String status;
   final List<CartItem> items;
@@ -38,6 +39,7 @@ class Order {
     required this.deliveryAddress,
     this.driverName,
     this.driverPhone,
+    this.assignmentId,
     required this.createdAt,
     this.estimatedDeliveryTime,
     this.paymentStatus,
@@ -94,6 +96,7 @@ class Order {
       deliveryAddress: json['delivery_address'] ?? '',
       driverName: json['driver_name'],
       driverPhone: json['driver_phone'],
+      assignmentId: json['assignment_id'],
       createdAt: DateTime.parse(
           json['created_at'] ?? DateTime.now().toIso8601String()),
       estimatedDeliveryTime: json['estimated_delivery_time'] != null
@@ -129,6 +132,7 @@ class Order {
       'delivery_address': deliveryAddress,
       'driver_name': driverName,
       'driver_phone': driverPhone,
+      'assignment_id': assignmentId,
       'created_at': createdAt.toIso8601String(),
       'estimated_delivery_time': estimatedDeliveryTime?.toIso8601String(),
       'payment_status': paymentStatus,

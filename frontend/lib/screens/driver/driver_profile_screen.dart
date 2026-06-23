@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/driver_provider.dart';
+import '../../utils/formatters.dart';
 import '../../models/user.dart';
 import '../../routes/app_routes.dart';
 
@@ -12,6 +14,20 @@ class DriverProfileScreen extends StatefulWidget {
 }
 
 class _DriverProfileScreenState extends State<DriverProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Load data when screen opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
+    });
+  }
+
+  Future<void> _loadData() async {
+    final driverProvider = Provider.of<DriverProvider>(context, listen: false);
+    await driverProvider.fetchAssignedOrders();
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
@@ -25,21 +41,24 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
         foregroundColor: const Color(0xFF0A1A2B),
         elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            _buildProfileHeader(user),
-            const SizedBox(height: 16),
-            _buildStatsRow(),
-            const SizedBox(height: 16),
-            _buildVehicleInfo(),
-            const SizedBox(height: 16),
-            _buildContactSettings(),
-            const SizedBox(height: 16),
-            _buildMenuItems(),
-            const SizedBox(height: 16),
-          ],
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              _buildProfileHeader(user),
+              const SizedBox(height: 16),
+              _buildStatsRow(),
+              const SizedBox(height: 16),
+              _buildVehicleInfo(),
+              const SizedBox(height: 16),
+              _buildContactSettings(),
+              const SizedBox(height: 16),
+              _buildMenuItems(),
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );
@@ -145,16 +164,50 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
     );
   }
 
+  // ✅ UPDATED: Real data from DriverProvider
   Widget _buildStatsRow() {
+    final driverProvider = Provider.of<DriverProvider>(context, listen: false);
+    final orders = driverProvider.assignedOrders;
+    
+    // Calculate real stats
+    final deliveredOrders = orders.where((o) => 
+      o.status?.toLowerCase() == 'delivered' || 
+      o.status?.toLowerCase() == 'completed'
+    ).toList();
+    
+    final totalEarnings = deliveredOrders.fold(0.0, (sum, o) => sum + (o.deliveryFee ?? 0));
+    
+    final activeOrders = orders.where((o) =>
+      o.status?.toLowerCase() != 'delivered' && 
+      o.status?.toLowerCase() != 'completed' &&
+      o.status?.toLowerCase() != 'cancelled'
+    ).length;
+
     return Row(
       children: [
-        _buildStatCard('342', 'Deliveries', Icons.delivery_dining, Colors.blue),
-        _buildStatCard('82K', 'Earnings', Icons.attach_money, Colors.green),
-        _buildStatCard('18', 'Avg Time', Icons.access_time, Colors.orange),
+        _buildStatCard(
+          '${orders.length}',
+          'Total Orders',
+          Icons.delivery_dining,
+          Colors.blue,
+        ),
+        _buildStatCard(
+          Formatters.currencyFormat(totalEarnings),
+          'Earnings',
+          Icons.attach_money,
+          Colors.green,
+        ),
+        _buildStatCard(
+          '$activeOrders',
+          'Active',
+          Icons.pending_actions,
+          Colors.orange,
+        ),
       ],
     );
   }
 
+  // ✅ UPDATED: Better text handling
   Widget _buildStatCard(String value, String label, IconData icon, Color color) {
     return Expanded(
       child: Container(
@@ -178,8 +231,11 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               value,
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 14,
+                fontSize: 12,
               ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             Text(
               label,
