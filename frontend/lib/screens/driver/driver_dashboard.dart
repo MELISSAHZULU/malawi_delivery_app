@@ -146,11 +146,21 @@ class _DriverDashboardState extends State<DriverDashboard> {
     final assignedOrders = driverProvider.assignedOrders;
     final availableOrders = driverProvider.availableOrders;
     final totalDeliveries = assignedOrders.length;
-    final deliveredCount = assignedOrders.where((o) => o.status == 'delivered').length;
-    final activeCount = assignedOrders.where((o) => o.status == 'driving' || o.status == 'picked_up').length;
+    final deliveredCount = assignedOrders.where((o) => 
+      o.status == 'delivered' || o.status == 'completed'
+    ).length;
+    
+    // ✅ FIXED: Active count includes pending, confirmed, ready, driving, picked_up
+    final activeCount = assignedOrders.where((o) => 
+      o.status == 'driving' || 
+      o.status == 'picked_up' ||
+      o.status == 'pending' ||
+      o.status == 'confirmed' ||
+      o.status == 'ready'
+    ).length;
 
     final totalEarnings = assignedOrders
-        .where((o) => o.status == 'delivered')
+        .where((o) => o.status == 'delivered' || o.status == 'completed')
         .fold(0.0, (sum, o) => sum + (o.deliveryFee ?? 0));
 
     return RefreshIndicator(
@@ -507,9 +517,10 @@ class _DriverDashboardState extends State<DriverDashboard> {
     );
   }
 
+  // ✅ FIXED: _buildDeliveryCard with deliveryFee instead of total
   Widget _buildDeliveryCard(dynamic order) {
     final status = order.status ?? 'pending';
-    final isDelivered = status == 'delivered';
+    final isDelivered = status == 'delivered' || status == 'completed';
     final isActive = status == 'driving' || status == 'picked_up';
     
     Color getStatusColor() {
@@ -563,8 +574,9 @@ class _DriverDashboardState extends State<DriverDashboard> {
               ],
             ),
           ),
+          // ✅ FIXED: Show deliveryFee instead of total
           Text(
-            Formatters.currencyFormat(order.total ?? 0),
+            Formatters.currencyFormat(order.deliveryFee ?? 0),
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 14,
