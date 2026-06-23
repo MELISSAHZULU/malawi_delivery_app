@@ -22,7 +22,8 @@ dependencies:
 
   # Maps & Location
   geolocator: ^10.0.1
-  google_maps_flutter: ^2.5.0
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.1
 
   # Real-time
   web_socket_channel: ^2.4.0
@@ -44,6 +45,8 @@ dependencies:
 
   # Image Picker
   image_picker: ^1.0.7
+
+  url_launcher: ^6.2.0
 
 dev_dependencies:
   flutter_test:

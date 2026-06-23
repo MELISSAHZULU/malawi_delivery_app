@@ -96,8 +96,8 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
     final isPending = status == 'pending' || status == 'accepted' || status == 'confirmed';
     
     // Extract data with proper fallbacks
-    final storeName = order.sellerName ?? order.storeName ?? 'Store';
-    final storeAddress = order.sellerAddress ?? order.storeAddress ?? 'Pickup location';
+    final storeName = order.sellerName ?? 'Store';
+    final storeAddress = order.sellerAddress ?? 'Pickup location';
     final deliveryAddress = order.deliveryAddress ?? 'Delivery location';
     final totalAmount = order.total ?? order.amount ?? 0;
     final orderNumber = order.orderNumber ?? 'Order #${order.id ?? ''}';

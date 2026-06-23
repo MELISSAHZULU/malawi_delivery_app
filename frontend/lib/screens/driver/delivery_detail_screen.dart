@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../providers/driver_provider.dart';
 import '../../utils/formatters.dart';
 
@@ -12,19 +14,18 @@ class DeliveryDetailScreen extends StatefulWidget {
 }
 
 class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
-  GoogleMapController? _mapController;
+  final MapController _mapController = MapController();
   dynamic order;
   bool _isLoading = true;
-  
+
   // Default coordinates (Lilongwe, Malawi)
   static const LatLng _defaultLocation = LatLng(-13.9626, 33.7741);
-  
-  // Mock coordinates for demo - replace with actual from order
+
   LatLng _pickupLocation = _defaultLocation;
-  LatLng _deliveryLocation = _defaultLocation;
-  
-  Set<Marker> _markers = {};
-  Set<Polyline> _polylines = {};
+  LatLng _deliveryLocation = LatLng(
+    _defaultLocation.latitude + 0.01,
+    _defaultLocation.longitude + 0.01,
+  );
 
   @override
   void didChangeDependencies() {
@@ -45,7 +46,6 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
   }
 
   void _setupLocations() {
-    // Try to get actual coordinates from order
     try {
       if (order.sellerLatitude != null && order.sellerLongitude != null) {
         _pickupLocation = LatLng(
@@ -54,7 +54,6 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
         );
       }
     } catch (e) {
-      // Use default location
       _pickupLocation = _defaultLocation;
     }
 
@@ -66,42 +65,73 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
         );
       }
     } catch (e) {
-      // Use nearby location for demo
       _deliveryLocation = LatLng(
         _defaultLocation.latitude + 0.01,
         _defaultLocation.longitude + 0.01,
       );
     }
+  }
 
-    // Add markers
-    _markers = {
-      Marker(
-        markerId: const MarkerId('pickup'),
-        position: _pickupLocation,
-        infoWindow: const InfoWindow(title: 'Pickup Location'),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-      ),
-      Marker(
-        markerId: const MarkerId('delivery'),
-        position: _deliveryLocation,
-        infoWindow: const InfoWindow(title: 'Delivery Location'),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-      ),
-    };
+  LatLng get _mapCenter => LatLng(
+        (_pickupLocation.latitude + _deliveryLocation.latitude) / 2,
+        (_pickupLocation.longitude + _deliveryLocation.longitude) / 2,
+      );
 
-    // Add route polyline
-    _polylines = {
-      Polyline(
-        polylineId: const PolylineId('route'),
-        points: [_pickupLocation, _deliveryLocation],
-        color: Colors.blue,
-        width: 4,
-        patterns: [
-          PatternItem.dash(30),
-          PatternItem.gap(10),
-        ],
-      ),
-    };
+  Future<void> _openGoogleMaps(String address) async {
+    final String encodedAddress = Uri.encodeComponent(address);
+    final String url =
+        'https://www.google.com/maps/dir/?api=1&destination=$encodedAddress';
+    try {
+      if (await canLaunchUrl(Uri.parse(url))) {
+        await launchUrl(Uri.parse(url));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open Google Maps'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _makePhoneCall(String? phoneNumber) async {
+    if (phoneNumber == null || phoneNumber.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No phone number available'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    final String url = 'tel:$phoneNumber';
+    try {
+      if (await canLaunchUrl(Uri.parse(url))) {
+        await launchUrl(Uri.parse(url));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not make call'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -115,55 +145,90 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
         foregroundColor: Colors.black,
         actions: [
           IconButton(
-            icon: const Icon(Icons.phone),
-            onPressed: () {
-              // Call customer
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('📞 Calling customer...'),
-                ),
-              );
-            },
+            icon: const Icon(Icons.phone, color: Colors.green),
+            onPressed: () => _makePhoneCall(order?.customerPhone),
           ),
           IconButton(
-            icon: const Icon(Icons.navigation),
-            onPressed: () {
-              // Open Google Maps
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('🗺️ Opening navigation...'),
-                ),
-              );
-            },
+            icon: const Icon(Icons.navigation, color: Colors.blue),
+            onPressed: () => _openGoogleMaps(order?.deliveryAddress ?? ''),
           ),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : order == null
-              ? const Center(child: Text('Order not found'))
+              ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline, size: 60, color: Colors.grey),
+                      SizedBox(height: 16),
+                      Text(
+                        'Order not found',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
               : Column(
                   children: [
                     // Map
                     Expanded(
                       flex: 2,
-                      child: GoogleMap(
-                        initialCameraPosition: CameraPosition(
-                          target: _pickupLocation,
-                          zoom: 14,
+                      child: FlutterMap(
+                        mapController: _mapController,
+                        options: MapOptions(
+                          initialCenter: _mapCenter,
+                          initialZoom: 13,
                         ),
-                        markers: _markers,
-                        polylines: _polylines,
-                        myLocationEnabled: true,
-                        myLocationButtonEnabled: true,
-                        onMapCreated: (controller) {
-                          _mapController = controller;
-                          // Fit camera to show both markers
-                          _fitCameraToMarkers();
-                        },
+                        children: [
+                          TileLayer(
+                            urlTemplate:
+                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            userAgentPackageName: 'com.example.malawi_delivery',
+                          ),
+                          PolylineLayer(
+                            polylines: [
+                              Polyline(
+                                points: [_pickupLocation, _deliveryLocation],
+                                color: Colors.blue,
+                                strokeWidth: 4,
+                              ),
+                            ],
+                          ),
+                          MarkerLayer(
+                            markers: [
+                              // Pickup marker (blue)
+                              Marker(
+                                point: _pickupLocation,
+                                width: 40,
+                                height: 40,
+                                child: const Icon(
+                                  Icons.storefront,
+                                  color: Colors.blue,
+                                  size: 36,
+                                ),
+                              ),
+                              // Delivery marker (green)
+                              Marker(
+                                point: _deliveryLocation,
+                                width: 40,
+                                height: 40,
+                                child: const Icon(
+                                  Icons.location_on,
+                                  color: Colors.green,
+                                  size: 36,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                    
+
                     // Order details
                     Expanded(
                       flex: 1,
@@ -183,45 +248,15 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Status Header
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text(
-                                    'Head to Pickup',
-                                    style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.orange.shade100,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      order.status?.toUpperCase() ?? 'PENDING',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.orange.shade800,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                              _buildStatusHeader(),
                               const SizedBox(height: 8),
-                              
-                              // Order Number and Amount
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    order.orderNumber ?? 'Order #${order.id ?? ''}',
+                                    order.orderNumber ??
+                                        'Order #${order.id ?? ''}',
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
@@ -229,7 +264,8 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                                     ),
                                   ),
                                   Text(
-                                    Formatters.currencyFormat(order.total ?? order.amount ?? 0),
+                                    Formatters.currencyFormat(
+                                        order.total ?? order.amount ?? 0),
                                     style: const TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
@@ -239,29 +275,27 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                                 ],
                               ),
                               const SizedBox(height: 12),
-                              
-                              // Pickup location
                               _buildLocationRow(
                                 icon: Icons.storefront,
                                 iconColor: Colors.blue,
                                 title: 'Pickup from',
                                 subtitle: order.sellerName ?? 'Store',
-                                address: order.sellerAddress ?? order.pickupAddress ?? 'Pickup location',
+                                address: order.sellerAddress ??
+                                    order.pickupAddress ??
+                                    'Pickup location',
                               ),
                               const SizedBox(height: 8),
-                              
-                              // Delivery location
                               _buildLocationRow(
                                 icon: Icons.location_on,
                                 iconColor: Colors.green,
                                 title: 'Deliver to',
                                 subtitle: order.customerName ?? 'Customer',
-                                address: order.deliveryAddress ?? 'Delivery location',
+                                address: order.deliveryAddress ??
+                                    'Delivery location',
                               ),
                               const SizedBox(height: 12),
-                              
-                              // Order Items
-                              if (order.items != null && order.items.isNotEmpty) ...[
+                              if (order.items != null &&
+                                  order.items.isNotEmpty) ...[
                                 const Divider(),
                                 const Text(
                                   'Order Items',
@@ -273,62 +307,82 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                                 const SizedBox(height: 8),
                                 ...List.generate(
                                   order.items.length,
-                                  (index) => _buildOrderItem(
-                                    order.items[index],
-                                  ),
+                                  (index) =>
+                                      _buildOrderItem(order.items[index]),
                                 ),
                               ],
-                              
                               const SizedBox(height: 8),
-                              
-                              // Customer and Seller info
                               const Divider(),
                               Row(
                                 children: [
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        const Text(
-                                          'Customer',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey,
-                                          ),
-                                        ),
+                                        const Text('Customer',
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey)),
                                         const SizedBox(height: 4),
                                         Text(
                                           order.customerName ?? 'Customer',
                                           style: const TextStyle(
-                                            fontWeight: FontWeight.w500,
-                                          ),
+                                              fontWeight: FontWeight.w500),
                                         ),
+                                        if (order.customerPhone != null) ...[
+                                          const SizedBox(height: 4),
+                                          InkWell(
+                                            onTap: () => _makePhoneCall(
+                                                order.customerPhone),
+                                            child: Text(
+                                              order.customerPhone,
+                                              style: TextStyle(
+                                                  fontSize: 12,
+                                                  color:
+                                                      Colors.blue.shade700),
+                                            ),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        const Text(
-                                          'Seller',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey,
-                                          ),
-                                        ),
+                                        const Text('Seller',
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey)),
                                         const SizedBox(height: 4),
                                         Text(
                                           order.sellerName ?? 'Store',
                                           style: const TextStyle(
-                                            fontWeight: FontWeight.w500,
-                                          ),
+                                              fontWeight: FontWeight.w500),
                                         ),
+                                        if (order.sellerPhone != null) ...[
+                                          const SizedBox(height: 4),
+                                          InkWell(
+                                            onTap: () => _makePhoneCall(
+                                                order.sellerPhone),
+                                            child: Text(
+                                              order.sellerPhone,
+                                              style: TextStyle(
+                                                  fontSize: 12,
+                                                  color:
+                                                      Colors.blue.shade700),
+                                            ),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),
                                 ],
                               ),
+                              const SizedBox(height: 12),
+                              _buildActionButtons(),
                             ],
                           ),
                         ),
@@ -336,7 +390,49 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                     ),
                   ],
                 ),
-      ),
+    );
+  }
+
+  Widget _buildStatusHeader() {
+    final status = order.status ?? 'pending';
+    final isDriving = status == 'driving' || status == 'picked_up';
+    final isDelivered = status == 'delivered';
+
+    String getHeaderText() {
+      if (isDelivered) return 'Delivery Completed 🎉';
+      if (isDriving) return 'Head to Customer';
+      return 'Head to Pickup';
+    }
+
+    Color getStatusColor() {
+      if (isDelivered) return Colors.green;
+      if (isDriving) return Colors.blue;
+      return Colors.orange;
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          getHeaderText(),
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: getStatusColor().withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            order.status?.toUpperCase() ?? 'PENDING',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: getStatusColor(),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -363,26 +459,14 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade500,
-                ),
-              ),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              Text(
-                address,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade700,
-                ),
-              ),
+              Text(title,
+                  style:
+                      TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+              Text(subtitle,
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text(address,
+                  style:
+                      TextStyle(fontSize: 14, color: Colors.grey.shade700)),
             ],
           ),
         ),
@@ -404,49 +488,216 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
           ),
           Text(
             Formatters.currencyFormat(
-              (item['price'] ?? 0) * (item['quantity'] ?? 0)
-            ),
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
+                (item['price'] ?? 0) * (item['quantity'] ?? 0)),
+            style:
+                const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
           ),
         ],
       ),
     );
   }
 
-  void _fitCameraToMarkers() {
-    if (_mapController == null) return;
-    
-    // Create bounds from both markers
-    final bounds = LatLngBounds(
-      southwest: LatLng(
-        _pickupLocation.latitude < _deliveryLocation.latitude 
-            ? _pickupLocation.latitude 
-            : _deliveryLocation.latitude,
-        _pickupLocation.longitude < _deliveryLocation.longitude 
-            ? _pickupLocation.longitude 
-            : _deliveryLocation.longitude,
-      ),
-      northeast: LatLng(
-        _pickupLocation.latitude > _deliveryLocation.latitude 
-            ? _pickupLocation.latitude 
-            : _deliveryLocation.latitude,
-        _pickupLocation.longitude > _deliveryLocation.longitude 
-            ? _pickupLocation.longitude 
-            : _deliveryLocation.longitude,
-      ),
+  Widget _buildActionButtons() {
+    final status = order.status ?? 'pending';
+    final isDriving = status == 'driving' || status == 'picked_up';
+    final isPending =
+        status == 'pending' || status == 'accepted' || status == 'confirmed';
+    final isDelivered = status == 'delivered';
+
+    if (isDelivered) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.green.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.green.shade200),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.check_circle, color: Colors.green),
+            SizedBox(width: 8),
+            Text('Delivery Completed',
+                style: TextStyle(
+                    color: Colors.green, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        if (isDriving)
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _showCompleteDialog,
+              icon: const Icon(Icons.check_circle),
+              label: const Text('Complete'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          )
+        else if (isPending)
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _showPickupDialog,
+              icon: const Icon(Icons.shopping_bag),
+              label: const Text('Pick Up'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0A1A2B),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () =>
+                _openGoogleMaps(order.deliveryAddress ?? ''),
+            icon: const Icon(Icons.navigation),
+            label: const Text('Navigate'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.blue,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+              side: const BorderSide(color: Colors.blue),
+            ),
+          ),
+        ),
+      ],
     );
-    
-    _mapController!.animateCamera(
-      CameraUpdate.newLatLngBounds(bounds, 80),
+  }
+
+  void _showPickupDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Confirm Pickup'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Ready to pick up this order?'),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '📍 ${order.sellerName ?? 'Store'}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                final driverProvider =
+                    Provider.of<DriverProvider>(context, listen: false);
+                final success = await driverProvider.updateDeliveryStatus(
+                    order.id.toString(), 'pick_up');
+                if (success && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ Order picked up successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  setState(() {});
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0A1A2B),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Pick Up'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showCompleteDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Complete Delivery'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Confirm delivery completion?'),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '📍 ${order.deliveryAddress ?? 'Delivery address'}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                final driverProvider =
+                    Provider.of<DriverProvider>(context, listen: false);
+                final success = await driverProvider.updateDeliveryStatus(
+                    order.id.toString(), 'deliver');
+                if (success && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ Delivery completed successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  setState(() {});
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Complete'),
+            ),
+          ],
+        );
+      },
     );
   }
 
   @override
   void dispose() {
-    _mapController?.dispose();
+    _mapController.dispose();
     super.dispose();
   }
 }

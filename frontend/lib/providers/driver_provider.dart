@@ -28,12 +28,15 @@ class DriverProvider extends ChangeNotifier {
         if (data is List) {
           _assignedOrders = data.map((item) {
             try {
-              return Order.fromJson(item);
-            } catch (e) {
+              // Order data is nested inside order_details
+              final orderDetails = item['order_details'] as Map<String, dynamic>?;
+              if (orderDetails == null) return null;
+              return Order.fromJson(orderDetails);
+           }  catch (e) {
               print('Error parsing order: $e');
               return null;
-            }
-          }).whereType<Order>().toList();
+           }
+         }).whereType<Order>().toList();
           print('Driver orders loaded: ${_assignedOrders.length}');
         } else {
           _assignedOrders = [];
