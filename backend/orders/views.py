@@ -236,109 +236,33 @@ class UpdateOrderStatusView(generics.UpdateAPIView):
                 )
             
             # ============================================
-            # AUTO-ASSIGN DRIVER WHEN ORDER IS READY
+            # SIMPLIFIED: Just notify drivers when ready
             # ============================================
             if new_status == 'ready':
-                print(f"🔍 Order {order.order_number} is ready! Finding a driver...")
+                print(f"🔔 Order {order.order_number} is ready, notifying all drivers...")
                 
-                # Find available drivers
                 available_drivers = DriverProfile.objects.filter(
                     is_available=True,
                     is_verified=True,
                     user__is_active=True
                 )
                 
-                if available_drivers.exists():
-                    # Select a random available driver
-                    driver_profile = random.choice(available_drivers)
-                    driver_user = driver_profile.user
-                    
-                    print(f"✅ Assigning driver: {driver_user.username}")
-                    
-                    # Create delivery assignment
-                    assignment = DeliveryAssignment.objects.create(
-                        order=order,
-                        driver=driver_user,
-                        status='accepted'
-                    )
-                    
-                    # Update order with driver
-                    order.driver = driver_user
-                    order.status = 'picked_up'  # Auto-advance to picked_up
-                    order.save()
-                    
-                    print(f"✅ Driver {driver_user.username} assigned to order {order.order_number}")
-                    
-                    # Notify driver
+                for driver_profile in available_drivers:
                     Notification.objects.create(
-                        user=driver_user,
-                        title=f"New Delivery: {order.order_number}",
-                        message=f"You have been assigned to deliver order #{order.order_number}. Pickup from {order.seller.store_name}.",
+                        user=driver_profile.user,
+                        title=f"New Delivery Available: {order.order_number}",
+                        message=f"New order #{order.order_number} is ready for pickup from {order.seller.store_name}.",
                         type='delivery',
                         data={
                             'order_id': order.id,
                             'order_number': order.order_number,
                             'pickup_address': order.seller.address,
                             'dropoff_address': order.delivery_address,
-                            'total': float(order.total),
-                            'driver_id': driver_user.id
+                            'delivery_fee': float(order.delivery_fee),
                         }
                     )
-                    
-                    # Notify seller that driver is assigned
-                    Notification.objects.create(
-                        user=order.seller.user,
-                        title=f"Driver Assigned: {order.order_number}",
-                        message=f"Driver {driver_user.username} has been assigned to deliver order #{order.order_number}.",
-                        type='delivery',
-                        data={
-                            'order_id': order.id,
-                            'order_number': order.order_number,
-                            'driver_name': driver_user.username,
-                            'driver_phone': driver_user.phone_number,
-                            'driver_vehicle': driver_profile.vehicle_type,
-                            'driver_plate': driver_profile.vehicle_plate
-                        }
-                    )
-                    
-                    # Notify buyer
-                    Notification.objects.create(
-                        user=order.buyer.user,
-                        title=f"Driver Assigned: {order.order_number}",
-                        message=f"Your order #{order.order_number} is being delivered by {driver_user.username}.",
-                        type='delivery',
-                        data={
-                            'order_id': order.id,
-                            'order_number': order.order_number,
-                            'driver_name': driver_user.username,
-                            'driver_phone': driver_user.phone_number,
-                            'driver_vehicle': driver_profile.vehicle_type,
-                            'driver_plate': driver_profile.vehicle_plate
-                        }
-                    )
-                    
-                    return Response({
-                        'order': OrderSerializer(order).data,
-                        'driver_assigned': True,
-                        'driver': {
-                            'name': driver_user.username,
-                            'phone': driver_user.phone_number,
-                            'vehicle': driver_profile.vehicle_type,
-                            'plate': driver_profile.vehicle_plate,
-                            'rating': driver_profile.rating
-                        }
-                    }, status=status.HTTP_200_OK)
-                    
-                else:
-                    print(f"⚠️ No drivers available for order {order.order_number}")
-                    # Notify seller that no drivers are available
-                    Notification.objects.create(
-                        user=order.seller.user,
-                        title=f"No Driver Available: {order.order_number}",
-                        message=f"No drivers are currently available for order #{order.order_number}. Please wait.",
-                        type='system',
-                        data={'order_id': order.id, 'order_number': order.order_number}
-                    )
+                
+                print(f"✅ Notified {available_drivers.count()} drivers")
             
             return Response(OrderSerializer(order).data, status=status.HTTP_200_OK)
             
@@ -392,3 +316,21 @@ class WeeklyEarningsView(APIView):
             'weekdays': weekdays,
             'orders_count': orders.count()
         })
+
+class AvailableOrdersForDriverView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        if request.user.role != 'driver':
+            return Response(
+                {'error': 'Only drivers can view available orders'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Orders that are ready and have no driver assigned
+        orders = Order.objects.filter(
+            status='ready',
+            driver__isnull=True
+        ).order_by('-created_at')
+        
+        return Response(OrderSerializer(orders).data)

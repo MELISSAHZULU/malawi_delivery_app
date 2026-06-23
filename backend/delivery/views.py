@@ -11,6 +11,7 @@ from orders.models import Order
 from accounts.models import DriverProfile
 from notifications.models import Notification
 import random
+from orders.serializers import OrderSerializer
 
 User = get_user_model()
 
@@ -257,3 +258,30 @@ class UpdateDeliveryStatusView(APIView):
                 {'error': f'Invalid action: {action}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+# ✅ FIXED: AvailableOrdersForDriverView - returns plain list
+class AvailableOrdersForDriverView(APIView):
+    """
+    Get available orders for drivers.
+    Returns orders that are 'ready' and have no driver assigned.
+    Returns a plain list (not wrapped in success/data).
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        # Check if user is a driver
+        if request.user.role != 'driver':
+            return Response(
+                {'error': 'Only drivers can view available orders'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get orders that are ready and have no driver assigned
+        orders = Order.objects.filter(
+            status='ready',
+            driver__isnull=True
+        ).order_by('-created_at')
+        
+        # ✅ FIXED: Return plain list, not wrapped
+        serialized = OrderSerializer(orders, many=True).data
+        return Response(serialized)

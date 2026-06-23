@@ -63,49 +63,66 @@ class DriverProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ✅ FIXED: fetchAvailableOrders handles both plain list and wrapped response
   Future<void> fetchAvailableOrders() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      // Get all orders that are ready for pickup
-      final response = await _apiService.getOrders();
+      final response = await _apiService.getAvailableOrders();
       print('Fetch available orders response: $response');
       
-      if (response['success'] == true) {
-        final data = response['data'];
-        if (data is List) {
-          // Filter orders that are 'ready' and not assigned to any driver
-          _availableOrders = data
-              .map((item) {
-                try {
-                  return Order.fromJson(item);
-                } catch (e) {
-                  print('Error parsing order: $e');
-                  return null;
-                }
-              })
-              .whereType<Order>()
-              .where((order) => order.status == 'ready' && order.driverName == null)
-              .toList();
-          print('Available orders loaded: ${_availableOrders.length}');
+      // Handle both cases:
+      // 1. Plain list: [{...}, {...}]
+      // 2. Wrapped response: {'success': true, 'data': [{...}]}
+      List<dynamic> ordersList = [];
+      
+      if (response is List) {
+        // Plain list response
+        ordersList = response;
+        print('✅ Available orders: plain list with ${ordersList.length} items');
+      } else if (response is Map<String, dynamic>) {
+        // Wrapped response
+        if (response['success'] == true) {
+          final data = response['data'];
+          if (data is List) {
+            ordersList = data;
+            print('✅ Available orders: wrapped list with ${ordersList.length} items');
+          } else {
+            print('⚠️ Response data is not a list: ${data.runtimeType}');
+          }
         } else {
-          _availableOrders = [];
+          _error = response['error'] ?? 'Failed to fetch available orders';
+          print('Error loading available orders: $_error');
         }
       } else {
-        _error = response['error'] ?? 'Failed to fetch available orders';
-        print('Error loading available orders: $_error');
+        print('⚠️ Unexpected response type: ${response.runtimeType}');
+        _error = 'Unexpected response format';
       }
+      
+      // Parse the orders list
+      _availableOrders = ordersList.map((item) {
+        try {
+          return Order.fromJson(item as Map<String, dynamic>);
+        } catch (e) {
+          print('Error parsing available order: $e');
+          return null;
+        }
+      }).whereType<Order>().toList();
+      
+      print('Available orders parsed: ${_availableOrders.length}');
+      
     } catch (e) {
       _error = 'Network error: $e';
-      print('Network error: $e');
+      print('Network error fetching available orders: $e');
     }
 
     _isLoading = false;
     notifyListeners();
   }
 
+  // ✅ FIXED: acceptDelivery refreshes both lists correctly
   Future<bool> acceptDelivery(int orderId) async {
     _isLoading = true;
     _error = null;
@@ -116,6 +133,7 @@ class DriverProvider extends ChangeNotifier {
       print('Accept delivery response: $response');
       
       if (response['success'] == true) {
+        // ✅ FIXED: Refresh both lists — accepted order moves from available to assigned
         await fetchAssignedOrders();
         await fetchAvailableOrders();
         _isLoading = false;
@@ -164,23 +182,23 @@ class DriverProvider extends ChangeNotifier {
     }
   }
 
-  // New method to get a single order by ID
+  // Method to get a single order by ID
   Order? getOrderById(String id) {
     try {
       final results = _assignedOrders.where((order) => order.id.toString() == id);
       return results.isNotEmpty ? results.first : null;
     } catch (e) {
       return null;
-   }
- }
+    }
+  }
 
-  // New method to get order status
+  // Method to get order status
   String getOrderStatus(String id) {
     final order = getOrderById(id);
     return order?.status ?? 'unknown';
   }
 
-  // New method to check if order is in a specific state
+  // Method to check if order is in a specific state
   bool isOrderPending(String id) {
     final order = getOrderById(id);
     if (order == null) return false;

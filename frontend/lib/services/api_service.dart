@@ -702,4 +702,31 @@ class ApiService {
   Future<void> logout() async {
     await _storage.deleteAll();
   }
+
+  Future<Map<String, dynamic>> getAvailableOrders() async {
+  try {
+    final token = await _storage.read(key: 'access_token');
+    if (token == null) return {'success': false, 'error': 'Not authenticated'};
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/delivery/available/'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    print('Get available orders status: ${response.statusCode}');
+    print('Get available orders body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return {'success': true, 'data': json.decode(response.body)};
+    }
+    return {'success': false, 'error': 'Failed to fetch available orders'};
+  } catch (e) {
+    return {'success': false, 'error': e.toString()};
+  }
 }
+}
+
