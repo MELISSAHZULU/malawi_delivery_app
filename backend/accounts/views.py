@@ -1,3 +1,5 @@
+# backend/accounts/views.py
+
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -9,6 +11,7 @@ from .serializers import RegisterSerializer, UserSerializer, ProfileSerializer, 
 from .models import User, SellerProfile
 
 User = get_user_model()
+
 
 class RegisterView(generics.CreateAPIView):
     permission_classes = [AllowAny]
@@ -39,6 +42,7 @@ class RegisterView(generics.CreateAPIView):
             'success': False,
             'error': ' | '.join(error_messages) if error_messages else 'Registration failed'
         }, status=status.HTTP_400_BAD_REQUEST)
+
 
 class LoginView(TokenObtainPairView):
     permission_classes = [AllowAny]
@@ -96,12 +100,14 @@ class LoginView(TokenObtainPairView):
             'message': 'Login successful'
         }, status=status.HTTP_200_OK)
 
+
 class ProfileView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = ProfileSerializer
     
     def get_object(self):
         return self.request.user
+
 
 class UpdateStoreView(generics.UpdateAPIView):
     permission_classes = [IsAuthenticated]

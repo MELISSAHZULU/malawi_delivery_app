@@ -1,6 +1,8 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 from orders.models import Order
+
 
 class DriverLocation(models.Model):
     """Track driver real-time location"""
@@ -10,13 +12,18 @@ class DriverLocation(models.Model):
         related_name='driver_location',
         limit_choices_to={'role': 'driver'}
     )
-    latitude = models.DecimalField(max_digits=9, decimal_places=6, default=0)
-    longitude = models.DecimalField(max_digits=9, decimal_places=6, default=0)
+    latitude = models.DecimalField(max_digits=10, decimal_places=7, default=0)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, default=0)
     is_active = models.BooleanField(default=True)
     last_updated = models.DateTimeField(auto_now=True)
     
     def __str__(self):
         return f"{self.driver.username} - ({self.latitude}, {self.longitude})"
+    
+    class Meta:
+        db_table = 'delivery_driver_locations'
+        ordering = ['-last_updated']
+
 
 class DeliveryAssignment(models.Model):
     """Track delivery assignments"""
@@ -31,7 +38,11 @@ class DeliveryAssignment(models.Model):
         ('cancelled', 'Cancelled'),
     )
     
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='delivery')
+    order = models.OneToOneField(
+        Order, 
+        on_delete=models.CASCADE, 
+        related_name='delivery_assignment'
+    )
     driver = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -44,6 +55,10 @@ class DeliveryAssignment(models.Model):
     picked_up_at = models.DateTimeField(null=True, blank=True)
     delivered_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True)
+    
+    # Distance tracking (in km)
+    distance_to_restaurant = models.FloatField(null=True, blank=True)
+    distance_to_customer = models.FloatField(null=True, blank=True)
     
     def __str__(self):
         return f"Delivery {self.order.order_number} - {self.driver.username}"
@@ -76,3 +91,44 @@ class DeliveryAssignment(models.Model):
         self.order.status = 'delivered'
         self.order.actual_delivery_time = timezone.now()
         self.order.save()
+    
+    class Meta:
+        db_table = 'delivery_assignments'
+        ordering = ['-assigned_at']
+
+
+class DriverActivityLog(models.Model):
+    """Track driver activity for analytics"""
+    ACTION_CHOICES = (
+        ('online', 'Online'),
+        ('offline', 'Offline'),
+        ('accept', 'Accepted Order'),
+        ('pickup', 'Picked Up'),
+        ('deliver', 'Delivered'),
+        ('cancel', 'Cancelled'),
+    )
+    
+    driver = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='driver_activity_logs',
+        limit_choices_to={'role': 'driver'}
+    )
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    order = models.ForeignKey(
+        Order, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True
+    )
+    latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    notes = models.TextField(blank=True, default='')
+    
+    def __str__(self):
+        return f"{self.driver.username} - {self.action} at {self.timestamp}"
+    
+    class Meta:
+        db_table = 'delivery_activity_logs'
+        ordering = ['-timestamp']

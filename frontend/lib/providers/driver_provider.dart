@@ -70,7 +70,7 @@ class DriverProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _apiService.getAvailableOrders();
+      final dynamic response = await _apiService.getAvailableOrders();
       print('Fetch available orders response: $response');
       
       // Handle both cases:

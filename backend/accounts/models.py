@@ -1,3 +1,5 @@
+# backend/accounts/models.py
+
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
@@ -24,10 +26,12 @@ class User(AbstractUser):
     class Meta:
         db_table = 'users'
 
+
 class BuyerProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='buyer_profile')
     delivery_addresses = models.JSONField(default=list)
     order_count = models.IntegerField(default=0)
+
 
 class SellerProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='seller_profile')
@@ -39,21 +43,26 @@ class SellerProfile(models.Model):
     latitude = models.DecimalField(max_digits=9, decimal_places=6, default=0)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, default=0)
     is_active = models.BooleanField(default=True)
-    opening_hours = models.JSONField(default=dict)  # Store as dict: {"monday": "08:00-20:00", ...}
+    opening_hours = models.JSONField(default=dict)
     rating = models.FloatField(default=0)
     total_orders = models.IntegerField(default=0)
     delivery_fee = models.DecimalField(max_digits=10, decimal_places=2, default=1500)
     is_approved = models.BooleanField(default=False)
+    
+    def __str__(self):
+        return self.store_name
+
 
 class DriverProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='driver_profile')
     VEHICLE_CHOICES = (
         ('motorcycle', 'Motorcycle'),
         ('bicycle', 'Bicycle'),
         ('car', 'Car'),
     )
-    vehicle_type = models.CharField(max_length=50, choices=VEHICLE_CHOICES)
-    vehicle_plate = models.CharField(max_length=20)
+    
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='driver_profile')
+    vehicle_type = models.CharField(max_length=50, choices=VEHICLE_CHOICES, default='motorcycle')
+    vehicle_plate = models.CharField(max_length=20, blank=True)
     vehicle_image = models.ImageField(upload_to='vehicles/', null=True, blank=True)
     license_image = models.ImageField(upload_to='licenses/', null=True, blank=True)
     is_available = models.BooleanField(default=True)
@@ -61,3 +70,6 @@ class DriverProfile(models.Model):
     rating = models.FloatField(default=0)
     total_deliveries = models.IntegerField(default=0)
     bank_details = models.JSONField(default=dict)
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.vehicle_type}"

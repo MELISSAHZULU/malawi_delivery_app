@@ -35,9 +35,39 @@ class Order(models.Model):
     delivery_fee = models.DecimalField(max_digits=10, decimal_places=2, default=1500)
     total = models.DecimalField(max_digits=10, decimal_places=2)
     
+    # Delivery address
     delivery_address = models.CharField(max_length=255)
-    delivery_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
-    delivery_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    delivery_instructions = models.TextField(blank=True, default='')
+    
+    # Location coordinates
+    delivery_latitude = models.DecimalField(
+        max_digits=9, 
+        decimal_places=6, 
+        null=True, 
+        blank=True,
+        help_text="Latitude of delivery address"
+    )
+    delivery_longitude = models.DecimalField(
+        max_digits=9, 
+        decimal_places=6, 
+        null=True, 
+        blank=True,
+        help_text="Longitude of delivery address"
+    )
+    seller_latitude = models.DecimalField(
+        max_digits=9, 
+        decimal_places=6, 
+        null=True, 
+        blank=True,
+        help_text="Latitude of seller/restaurant"
+    )
+    seller_longitude = models.DecimalField(
+        max_digits=9, 
+        decimal_places=6, 
+        null=True, 
+        blank=True,
+        help_text="Longitude of seller/restaurant"
+    )
     
     payment_method = models.CharField(max_length=20, default='paychangu')
     payment_status = models.CharField(max_length=20, default='pending')

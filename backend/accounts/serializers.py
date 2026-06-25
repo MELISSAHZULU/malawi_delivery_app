@@ -1,3 +1,5 @@
+# backend/accounts/serializers.py
+
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -5,6 +7,7 @@ from django.core.exceptions import ValidationError
 from .models import BuyerProfile, SellerProfile, DriverProfile
 
 User = get_user_model()
+
 
 class UserSerializer(serializers.ModelSerializer):
     store_name = serializers.SerializerMethodField()
@@ -17,6 +20,7 @@ class UserSerializer(serializers.ModelSerializer):
         if hasattr(obj, 'seller_profile'):
             return obj.seller_profile.store_name
         return None
+
 
 class SellerProfileSerializer(serializers.ModelSerializer):
     phone_number = serializers.CharField(source='user.phone_number', required=False, allow_blank=True)
@@ -50,6 +54,7 @@ class SellerProfileSerializer(serializers.ModelSerializer):
             user.save()
         
         return instance
+
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)
@@ -99,8 +104,11 @@ class RegisterSerializer(serializers.ModelSerializer):
                 longitude=0
             )
             # Create wallet for seller
-            from payments.models import SellerWallet
-            SellerWallet.objects.get_or_create(seller=seller)
+            try:
+                from payments.models import SellerWallet
+                SellerWallet.objects.get_or_create(seller=seller)
+            except:
+                pass
         elif user.role == 'driver':
             DriverProfile.objects.create(
                 user=user,
@@ -109,6 +117,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             )
         
         return user
+
 
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
