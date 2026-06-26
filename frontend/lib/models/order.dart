@@ -1,5 +1,3 @@
-// lib/models/order.dart
-
 import 'cart_item.dart';
 
 class Order {
@@ -32,6 +30,7 @@ class Order {
   final double? deliveryLatitude;
   final double? deliveryLongitude;
   final String? deliveryInstructions; // delivery notes
+  final String? assignmentStatus; // status from assignment (overrides order status)
 
   Order({
     required this.id,
@@ -63,74 +62,9 @@ class Order {
     this.deliveryLatitude,
     this.deliveryLongitude,
     this.deliveryInstructions,
+    this.assignmentStatus,
   });
 
-  // ==================== copyWith Method ====================
-  Order copyWith({
-    String? id,
-    String? assignmentId,
-    String? orderNumber,
-    String? status,
-    List<CartItem>? items,
-    double? subtotal,
-    double? deliveryFee,
-    double? total,
-    String? deliveryAddress,
-    String? driverName,
-    String? driverPhone,
-    String? driverVehicle,
-    double? driverRating,
-    DateTime? createdAt,
-    DateTime? estimatedDeliveryTime,
-    String? paymentStatus,
-    String? paymentMethod,
-    String? sellerName,
-    String? sellerPhone,
-    String? sellerAddress,
-    String? pickupAddress,
-    String? buyerName,
-    String? customerName,
-    String? customerPhone,
-    double? sellerLatitude,
-    double? sellerLongitude,
-    double? deliveryLatitude,
-    double? deliveryLongitude,
-    String? deliveryInstructions,
-  }) {
-    return Order(
-      id: id ?? this.id,
-      assignmentId: assignmentId ?? this.assignmentId,
-      orderNumber: orderNumber ?? this.orderNumber,
-      status: status ?? this.status,
-      items: items ?? this.items,
-      subtotal: subtotal ?? this.subtotal,
-      deliveryFee: deliveryFee ?? this.deliveryFee,
-      total: total ?? this.total,
-      deliveryAddress: deliveryAddress ?? this.deliveryAddress,
-      driverName: driverName ?? this.driverName,
-      driverPhone: driverPhone ?? this.driverPhone,
-      driverVehicle: driverVehicle ?? this.driverVehicle,
-      driverRating: driverRating ?? this.driverRating,
-      createdAt: createdAt ?? this.createdAt,
-      estimatedDeliveryTime: estimatedDeliveryTime ?? this.estimatedDeliveryTime,
-      paymentStatus: paymentStatus ?? this.paymentStatus,
-      paymentMethod: paymentMethod ?? this.paymentMethod,
-      sellerName: sellerName ?? this.sellerName,
-      sellerPhone: sellerPhone ?? this.sellerPhone,
-      sellerAddress: sellerAddress ?? this.sellerAddress,
-      pickupAddress: pickupAddress ?? this.pickupAddress,
-      buyerName: buyerName ?? this.buyerName,
-      customerName: customerName ?? this.customerName,
-      customerPhone: customerPhone ?? this.customerPhone,
-      sellerLatitude: sellerLatitude ?? this.sellerLatitude,
-      sellerLongitude: sellerLongitude ?? this.sellerLongitude,
-      deliveryLatitude: deliveryLatitude ?? this.deliveryLatitude,
-      deliveryLongitude: deliveryLongitude ?? this.deliveryLongitude,
-      deliveryInstructions: deliveryInstructions ?? this.deliveryInstructions,
-    );
-  }
-
-  // ==================== fromJson / toJson ====================
   factory Order.fromJson(Map<String, dynamic> json) {
     List<CartItem> parseItems(dynamic itemsData) {
       if (itemsData == null) return [];
@@ -168,10 +102,13 @@ class Order {
       return null;
     }
 
+    // Check if we have assignment status override
+    final status = json['assignment_status'] ?? json['status'] ?? 'pending';
+
     return Order(
       id: (json['id'] ?? '').toString(),
       orderNumber: json['order_number'] ?? json['orderNumber'] ?? '',
-      status: json['status'] ?? 'pending',
+      status: status,
       items: parseItems(json['items']),
       subtotal: parseTotal(json['subtotal']),
       deliveryFee: parseTotal(json['delivery_fee'] ?? json['deliveryFee']),
@@ -207,6 +144,7 @@ class Order {
       deliveryLongitude: parseNullableDouble(
           json['delivery_longitude'] ?? json['deliveryLongitude']),
       deliveryInstructions: json['delivery_instructions'] ?? json['deliveryInstructions'],
+      assignmentStatus: json['assignment_status'],
     );
   }
 
@@ -241,10 +179,78 @@ class Order {
       'delivery_latitude': deliveryLatitude,
       'delivery_longitude': deliveryLongitude,
       'delivery_instructions': deliveryInstructions,
+      'assignment_status': assignmentStatus,
     };
   }
 
-  // ==================== Status Helpers ====================
+  // Copy with method
+  Order copyWith({
+    String? id,
+    String? assignmentId,
+    String? orderNumber,
+    String? status,
+    List<CartItem>? items,
+    double? subtotal,
+    double? deliveryFee,
+    double? total,
+    String? deliveryAddress,
+    String? driverName,
+    String? driverPhone,
+    String? driverVehicle,
+    double? driverRating,
+    DateTime? createdAt,
+    DateTime? estimatedDeliveryTime,
+    String? paymentStatus,
+    String? paymentMethod,
+    String? sellerName,
+    String? sellerPhone,
+    String? sellerAddress,
+    String? pickupAddress,
+    String? buyerName,
+    String? customerName,
+    String? customerPhone,
+    double? sellerLatitude,
+    double? sellerLongitude,
+    double? deliveryLatitude,
+    double? deliveryLongitude,
+    String? deliveryInstructions,
+    String? assignmentStatus,
+  }) {
+    return Order(
+      id: id ?? this.id,
+      orderNumber: orderNumber ?? this.orderNumber,
+      status: status ?? this.status,
+      items: items ?? this.items,
+      subtotal: subtotal ?? this.subtotal,
+      deliveryFee: deliveryFee ?? this.deliveryFee,
+      total: total ?? this.total,
+      deliveryAddress: deliveryAddress ?? this.deliveryAddress,
+      driverName: driverName ?? this.driverName,
+      driverPhone: driverPhone ?? this.driverPhone,
+      driverVehicle: driverVehicle ?? this.driverVehicle,
+      driverRating: driverRating ?? this.driverRating,
+      assignmentId: assignmentId ?? this.assignmentId,
+      createdAt: createdAt ?? this.createdAt,
+      estimatedDeliveryTime: estimatedDeliveryTime ?? this.estimatedDeliveryTime,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      sellerName: sellerName ?? this.sellerName,
+      sellerPhone: sellerPhone ?? this.sellerPhone,
+      sellerAddress: sellerAddress ?? this.sellerAddress,
+      pickupAddress: pickupAddress ?? this.pickupAddress,
+      buyerName: buyerName ?? this.buyerName,
+      customerName: customerName ?? this.customerName,
+      customerPhone: customerPhone ?? this.customerPhone,
+      sellerLatitude: sellerLatitude ?? this.sellerLatitude,
+      sellerLongitude: sellerLongitude ?? this.sellerLongitude,
+      deliveryLatitude: deliveryLatitude ?? this.deliveryLatitude,
+      deliveryLongitude: deliveryLongitude ?? this.deliveryLongitude,
+      deliveryInstructions: deliveryInstructions ?? this.deliveryInstructions,
+      assignmentStatus: assignmentStatus ?? this.assignmentStatus,
+    );
+  }
+
+  // Status helpers
   bool get isPending => status == 'pending';
   bool get isConfirmed => status == 'confirmed';
   bool get isPreparing => status == 'preparing';
@@ -252,23 +258,28 @@ class Order {
   bool get isPickedUp => status == 'picked_up';
   bool get isDriving => status == 'driving';
   bool get isArrived => status == 'arrived';
-  bool get isDelivered => status == 'delivered';
+  bool get isDelivered => status == 'delivered' || status == 'completed';
   bool get isCancelled => status == 'cancelled';
 
-  // ==================== Progress Calculation ====================
+  // Get the effective status (assignment status overrides order status)
+  String get effectiveStatus => assignmentStatus ?? status;
+
+  // Progress calculation
   double get progress {
     final statuses = [
       'pending', 'confirmed', 'preparing', 'ready',
       'picked_up', 'driving', 'arrived', 'delivered'
     ];
-    final index = statuses.indexOf(status);
+    final currentStatus = effectiveStatus;
+    final index = statuses.indexOf(currentStatus);
     if (index == -1) return 0;
     return (index / (statuses.length - 1)) * 100;
   }
 
-  // ==================== Status Display Name ====================
+  // Helper to get status display name
   String get statusDisplay {
-    switch (status) {
+    final currentStatus = effectiveStatus;
+    switch (currentStatus) {
       case 'pending':
         return 'Order Placed';
       case 'confirmed':
@@ -285,16 +296,19 @@ class Order {
         return 'Arrived';
       case 'delivered':
         return 'Delivered 🎉';
+      case 'completed':
+        return 'Completed 🎉';
       case 'cancelled':
         return 'Cancelled';
       default:
-        return status.toUpperCase();
+        return currentStatus.toUpperCase();
     }
   }
 
-  // ==================== Status Color (Hex String) ====================
+  // Helper to get status color
   String get statusColor {
-    switch (status) {
+    final currentStatus = effectiveStatus;
+    switch (currentStatus) {
       case 'pending':
         return '#F59E0B'; // Orange
       case 'confirmed':
@@ -311,6 +325,8 @@ class Order {
         return '#6366F1'; // Indigo
       case 'delivered':
         return '#22C55E'; // Green
+      case 'completed':
+        return '#22C55E'; // Green
       case 'cancelled':
         return '#EF4444'; // Red
       default:
@@ -318,8 +334,12 @@ class Order {
     }
   }
 
-  // ==================== Other Helpers ====================
+  // Check if driver is assigned
   bool get hasDriver => driverName != null && driverName!.isNotEmpty;
+
+  // Check if order is active (not delivered or cancelled)
   bool get isActive => !isDelivered && !isCancelled;
+
+  // Get items count
   int get itemCount => items.length;
 }

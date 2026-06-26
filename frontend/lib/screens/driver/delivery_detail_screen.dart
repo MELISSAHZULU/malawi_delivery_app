@@ -17,8 +17,9 @@ class DeliveryDetailScreen extends StatefulWidget {
 
 class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
   final MapController _mapController = MapController();
-  Map<String, dynamic>? _order;
+  Map<String, dynamic>? _orderData;
   bool _isLoading = true;
+  String _orderId = '';
 
   // Default coordinates (Lilongwe, Malawi)
   static const LatLng _defaultLocation = LatLng(-13.9626, 33.7741);
@@ -44,7 +45,6 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     try {
       dynamic orderData = widget.order;
       
-      // If widget.order is null, try to get from route arguments
       if (orderData == null) {
         final args = ModalRoute.of(context)?.settings.arguments;
         print('📦 Route arguments: $args');
@@ -53,64 +53,115 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
       
       if (orderData == null) {
         print('❌ No order data found');
-        _order = null;
+        _orderData = null;
         return;
       }
       
-      // Handle different data formats
+      print('📦 Order data type: ${orderData.runtimeType}');
+      
       if (orderData is Map) {
-        // Check if it has order_details (nested data from assignment)
-        if (orderData.containsKey('order_details') && orderData['order_details'] is Map) {
-          final details = orderData['order_details'] as Map;
-          _order = Map<String, dynamic>.from(details);
-          print('✅ Extracted order_details: ${_order?['order_number']}');
+        Map<String, dynamic> dataMap = {};
+        orderData.forEach((key, value) {
+          dataMap[key.toString()] = value;
+        });
+        
+        print('📦 Data map keys: ${dataMap.keys}');
+        
+        if (dataMap.containsKey('order') && dataMap['order'] is Map) {
+          final wrapped = dataMap['order'] as Map;
+          Map<String, dynamic> wrappedMap = {};
+          wrapped.forEach((key, value) {
+            wrappedMap[key.toString()] = value;
+          });
+          _orderData = wrappedMap;
+          _orderId = wrappedMap['id']?.toString() ?? '';
+          print('✅ Extracted wrapped order data');
+        } 
+        else if (dataMap.containsKey('order_details') && dataMap['order_details'] is Map) {
+          final details = dataMap['order_details'] as Map;
+          Map<String, dynamic> detailsMap = {};
+          details.forEach((key, value) {
+            detailsMap[key.toString()] = value;
+          });
+          
+          detailsMap['assignment_id'] = dataMap['id']?.toString();
+          detailsMap['driver_name'] = dataMap['driver_name'];
+          detailsMap['driver_phone'] = dataMap['driver_phone'];
+          detailsMap['seller_name'] = dataMap['seller_name'] ?? detailsMap['seller_name'];
+          detailsMap['delivery_address'] = dataMap['delivery_address'] ?? detailsMap['delivery_address'];
+          detailsMap['customer_name'] = dataMap['customer_name'] ?? detailsMap['customer_name'] ?? detailsMap['buyer_name'];
+          detailsMap['customer_phone'] = dataMap['customer_phone'] ?? detailsMap['customer_phone'] ?? detailsMap['buyer_phone'];
+          
+          if (dataMap.containsKey('status')) {
+            detailsMap['status'] = dataMap['status'].toString();
+            print('✅ Using assignment status: ${dataMap['status']}');
+          }
+          
+          _orderData = detailsMap;
+          _orderId = dataMap['id']?.toString() ?? '';
+          print('✅ Extracted order_details');
         } else {
-          _order = Map<String, dynamic>.from(orderData);
-          print('✅ Using order data directly: ${_order?['order_number']}');
+          _orderData = dataMap;
+          _orderId = dataMap['id']?.toString() ?? '';
+          print('✅ Using order data directly');
         }
-      } else if (orderData is String) {
-        // If it's a string ID, try to find the order
-        final driverProvider = Provider.of<DriverProvider>(context, listen: false);
-        final results = driverProvider.assignedOrders
-            .where((o) => o.id.toString() == orderData || o.orderNumber == orderData);
-        if (results.isNotEmpty) {
-          final found = results.first;
-          try {
-            _order = Map<String, dynamic>.from(found.toJson());
-            print('✅ Found order by ID: ${_order?['order_number']}');
-          } catch (e) {
-            print('❌ Could not convert found order to map: $e');
+        
+        if (_orderData != null) {
+          print('🔑 ALL KEYS: ${_orderData!.keys.toList()}');
+          print('🆔 id value: ${_orderData!['id']}');
+          print('👤 customer_name: ${_orderData!['customer_name']}');
+          print('🏪 seller_name: ${_orderData!['seller_name']}');
+          print('📍 delivery_address: ${_orderData!['delivery_address']}');
+        }
+        
+        if (_orderId.isEmpty || _orderId == 'null' || _orderId == '0') {
+          if (_orderData!.containsKey('assignment_id')) {
+            _orderId = _orderData!['assignment_id'].toString();
+          } else if (_orderData!.containsKey('order_id')) {
+            _orderId = _orderData!['order_id'].toString();
+          } else if (_orderData!.containsKey('id')) {
+            _orderId = _orderData!['id'].toString();
           }
         }
+        
+        print('✅ Final Order ID: $_orderId');
+        
+      } else if (orderData is String) {
+        final driverProvider = Provider.of<DriverProvider>(context, listen: false);
+        final found = driverProvider.getOrderById(orderData);
+        if (found != null) {
+          _orderData = found.toJson();
+          _orderId = orderData;
+          print('✅ Found order by ID: ${_orderData?['order_number']}');
+        } else {
+          print('❌ Order not found with ID: $orderData');
+          _orderData = null;
+        }
       } else {
-        // Try to convert to map
         try {
-          _order = Map<String, dynamic>.from(orderData.toJson());
-          print('✅ Converted order to map: ${_order?['order_number']}');
+          final map = orderData.toJson() as Map;
+          Map<String, dynamic> dataMap = {};
+          map.forEach((key, value) {
+            dataMap[key.toString()] = value;
+          });
+          _orderData = dataMap;
+          _orderId = dataMap['id']?.toString() ?? '';
+          print('✅ Converted order to map: ${_orderData?['order_number']}');
         } catch (e) {
-          print('❌ Could not convert order to map: $e');
-          _order = null;
+          print('❌ Could not convert order: $e');
+          _orderData = null;
         }
       }
       
-      // If we have an order but it's missing data, try to enrich it
-      if (_order != null) {
-        // Check if we need to extract from order_details (if it's still nested)
-        if (_order!.containsKey('order_details') && _order!['order_details'] is Map) {
-          final details = _order!['order_details'] as Map;
-          _order = Map<String, dynamic>.from(details);
-          print('✅ Extracted nested order_details: ${_order?['order_number']}');
-        }
-        
+      if (_orderData != null) {
         _setupLocations();
-        print('✅ Order loaded successfully: ${_order?['order_number']}');
-        print('📦 Order data keys: ${_order?.keys}');
+        print('✅ Order loaded successfully');
       } else {
         print('❌ Order is null after loading');
       }
     } catch (e) {
       print('❌ Error loading order: $e');
-      _order = null;
+      _orderData = null;
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -120,13 +171,12 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
 
   void _setupLocations() {
     try {
-      if (_order == null) return;
+      if (_orderData == null) return;
       
-      // Get location data from map
-      final sellerLat = _order?['seller_latitude'] ?? _order?['sellerLatitude'];
-      final sellerLng = _order?['seller_longitude'] ?? _order?['sellerLongitude'];
-      final deliveryLat = _order?['delivery_latitude'] ?? _order?['deliveryLatitude'];
-      final deliveryLng = _order?['delivery_longitude'] ?? _order?['deliveryLongitude'];
+      final sellerLat = _orderData?['seller_latitude'] ?? _orderData?['sellerLatitude'];
+      final sellerLng = _orderData?['seller_longitude'] ?? _orderData?['sellerLongitude'];
+      final deliveryLat = _orderData?['delivery_latitude'] ?? _orderData?['deliveryLatitude'];
+      final deliveryLng = _orderData?['delivery_longitude'] ?? _orderData?['deliveryLongitude'];
       
       if (sellerLat != null && sellerLng != null) {
         _pickupLocation = LatLng(
@@ -158,149 +208,80 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     );
   }
 
-  Future<void> _openGoogleMaps(String address) async {
-    final String encodedAddress = Uri.encodeComponent(address);
-    final String url = 'https://www.google.com/maps/dir/?api=1&destination=$encodedAddress';
-    try {
-      if (await canLaunchUrl(Uri.parse(url))) {
-        await launchUrl(Uri.parse(url));
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not open Google Maps'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  Future<void> _makePhoneCall(String? phoneNumber) async {
-    if (phoneNumber == null || phoneNumber.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No phone number available'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-    final String url = 'tel:$phoneNumber';
-    try {
-      if (await canLaunchUrl(Uri.parse(url))) {
-        await launchUrl(Uri.parse(url));
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not make call'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  // Helper to get value from order map - SAFE with null check
-  dynamic _getOrderValue(String key, {dynamic defaultValue}) {
-    // Return default if order is null
-    if (_order == null) {
-      print('⚠️ Order is null, returning default for key: $key');
-      return defaultValue;
+  String _getValue(String key, {String defaultValue = ''}) {
+    if (_orderData == null) return defaultValue;
+    
+    if (_orderData!.containsKey(key) && _orderData![key] != null) {
+      return _orderData![key].toString();
     }
     
-    // Check multiple possible key names
-    final possibleKeys = [key];
-    
-    // Handle common variations
-    if (key == 'order_number') {
-      possibleKeys.addAll(['orderNumber', 'order_no']);
-    } else if (key == 'seller_name') {
-      possibleKeys.addAll(['sellerName', 'store_name', 'storeName']);
-    } else if (key == 'seller_address') {
-      possibleKeys.addAll(['sellerAddress', 'store_address', 'storeAddress']);
-    } else if (key == 'delivery_address') {
-      possibleKeys.addAll(['deliveryAddress', 'address']);
-    } else if (key == 'customer_name') {
-      possibleKeys.addAll(['customerName', 'buyer_name', 'buyerName']);
-    } else if (key == 'customer_phone') {
-      possibleKeys.addAll(['customerPhone', 'buyer_phone', 'buyerPhone']);
-    } else if (key == 'delivery_fee') {
-      possibleKeys.addAll(['deliveryFee', 'fee', 'driver_fee', 'driverFee']);
-    }
-    
-    for (final k in possibleKeys) {
-      if (_order!.containsKey(k) && _order![k] != null) {
-        return _order![k];
-      }
+    final camelKey = _toCamelCase(key);
+    if (_orderData!.containsKey(camelKey) && _orderData![camelKey] != null) {
+      return _orderData![camelKey].toString();
     }
     
     return defaultValue;
   }
 
+  String _toCamelCase(String snake) {
+    final parts = snake.split('_');
+    if (parts.length <= 1) return snake;
+    return parts.first + parts.skip(1).map((p) => p[0].toUpperCase() + p.substring(1)).join('');
+  }
+
   String _getOrderNumber() {
-    final value = _getOrderValue('order_number', defaultValue: 'N/A');
-    return value?.toString() ?? 'N/A';
+    return _getValue('order_number', defaultValue: 'N/A');
   }
 
   String _getStatus() {
-    final value = _getOrderValue('status', defaultValue: 'pending');
-    return value?.toString() ?? 'pending';
+    final assignmentStatus = _getValue('status');
+    if (assignmentStatus.isNotEmpty && assignmentStatus != 'pending') {
+      return assignmentStatus;
+    }
+    return _getValue('order_status', defaultValue: 'pending');
   }
 
   String _getSellerName() {
-    final value = _getOrderValue('seller_name', defaultValue: 'Store');
-    return value?.toString() ?? 'Store';
+    return _getValue('seller_name', defaultValue: 'Store');
   }
 
   String _getSellerAddress() {
-    final value = _getOrderValue('seller_address', defaultValue: '');
-    return value?.toString() ?? '';
+    return _getValue('seller_address', defaultValue: '');
   }
 
   String _getDeliveryAddress() {
-    final value = _getOrderValue('delivery_address', defaultValue: 'Delivery location');
-    return value?.toString() ?? 'Delivery location';
+    return _getValue('delivery_address', defaultValue: 'Delivery location');
   }
 
   String _getCustomerName() {
-    final value = _getOrderValue('customer_name', defaultValue: 'Customer');
-    return value?.toString() ?? 'Customer';
+    final name = _getValue('customer_name');
+    if (name.isNotEmpty) return name;
+    return _getValue('buyer_name', defaultValue: 'Customer');
   }
 
   String _getCustomerPhone() {
-    final value = _getOrderValue('customer_phone', defaultValue: '');
-    return value?.toString() ?? '';
-  }
-
-  String _getDriverName() {
-    final value = _getOrderValue('driver_name', defaultValue: 'Driver');
-    return value?.toString() ?? 'Driver';
-  }
-
-  String _getDriverPhone() {
-    final value = _getOrderValue('driver_phone', defaultValue: '');
-    return value?.toString() ?? '';
+    final phone = _getValue('customer_phone');
+    if (phone.isNotEmpty) return phone;
+    return _getValue('buyer_phone', defaultValue: '');
   }
 
   double _getDeliveryFee() {
-    final value = _getOrderValue('delivery_fee', defaultValue: 1500.0);
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
-    if (value is String) return double.tryParse(value) ?? 1500.0;
+    if (_orderData == null) return 1500.0;
+    
+    if (_orderData!.containsKey('delivery_fee')) {
+      final value = _orderData!['delivery_fee'];
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 1500.0;
+    }
+    
+    if (_orderData!.containsKey('deliveryFee')) {
+      final value = _orderData!['deliveryFee'];
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 1500.0;
+    }
+    
     return 1500.0;
   }
 
@@ -326,7 +307,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _order == null
+          : _orderData == null
               ? _buildErrorState()
               : Column(
                   children: [
@@ -355,7 +336,6 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                           ),
                           MarkerLayer(
                             markers: [
-                              // Pickup marker (blue)
                               Marker(
                                 point: _pickupLocation,
                                 width: 40,
@@ -366,7 +346,6 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                                   size: 36,
                                 ),
                               ),
-                              // Delivery marker (green)
                               Marker(
                                 point: _deliveryLocation,
                                 width: 40,
@@ -415,7 +394,6 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                                       color: Colors.grey,
                                     ),
                                   ),
-                                  // Show only delivery fee, not full amount
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                     decoration: BoxDecoration(
@@ -511,7 +489,9 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                                 ],
                               ),
                               const SizedBox(height: 12),
-                              _buildActionButtons(),
+                              
+                              // ✅ Only Navigate button - no action buttons
+                              _buildNavigateButton(),
                             ],
                           ),
                         ),
@@ -653,141 +633,80 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     );
   }
 
-  Widget _buildActionButtons() {
-    final status = _getStatus();
-    final isDelivered = status == 'delivered' || status == 'completed';
-    final isDriving = status == 'driving' || status == 'picked_up';
-    final isPending = status == 'pending' || status == 'accepted' || status == 'confirmed' || status == 'ready';
-
-    if (isDelivered) {
-      return Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.green.shade50,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.green.shade200),
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.check_circle, color: Colors.green),
-            SizedBox(width: 8),
-            Text('Delivery Completed',
-                style: TextStyle(
-                    color: Colors.green, fontWeight: FontWeight.bold)),
-          ],
-        ),
-      );
-    }
-
-    return Row(
-      children: [
-        if (isDriving || isPending)
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: () => _showActionDialog(),
-              icon: const Icon(Icons.check_circle),
-              label: Text(isDriving ? 'Complete Delivery' : 'Pick Up Order'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isDriving ? Colors.green : const Color(0xFF0A1A2B),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
+  // ✅ Only Navigate button - no action buttons
+  Widget _buildNavigateButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => _openGoogleMaps(_getDeliveryAddress()),
+        icon: const Icon(Icons.navigation),
+        label: const Text('Navigate to Delivery Location'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.blue,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
           ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: () => _openGoogleMaps(_getDeliveryAddress()),
-            icon: const Icon(Icons.navigation),
-            label: const Text('Navigate'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.blue,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-              side: const BorderSide(color: Colors.blue),
-            ),
-          ),
+          side: const BorderSide(color: Colors.blue),
         ),
-      ],
+      ),
     );
   }
 
-  void _showActionDialog() {
-    final status = _getStatus();
-    final isDriving = status == 'driving' || status == 'picked_up';
-    final orderId = _getOrderValue('id');
-    
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: Text(isDriving ? 'Complete Delivery' : 'Confirm Pickup'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(isDriving 
-                ? 'Confirm delivery to the customer?' 
-                : 'Ready to pick up this order from the seller?'),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  isDriving 
-                    ? '📍 ${_getDeliveryAddress()}'
-                    : '📍 ${_getSellerName()}\n${_getSellerAddress()}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
+  Future<void> _openGoogleMaps(String address) async {
+    final String encodedAddress = Uri.encodeComponent(address);
+    final String url = 'https://www.google.com/maps/dir/?api=1&destination=$encodedAddress';
+    try {
+      if (await canLaunchUrl(Uri.parse(url))) {
+        await launchUrl(Uri.parse(url));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open Google Maps'),
+            backgroundColor: Colors.red,
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.pop(dialogContext);
-                
-                final driverProvider = Provider.of<DriverProvider>(context, listen: false);
-                final action = isDriving ? 'deliver' : 'pick_up';
-                
-                final messenger = ScaffoldMessenger.of(context);
-                final success = await driverProvider.updateDeliveryStatus(
-                  orderId?.toString() ?? '',
-                  action
-                );
-                
-                messenger.showSnackBar(
-                  SnackBar(
-                    content: Text(success ? '✅ Action completed successfully' : '❌ ${driverProvider.error ?? 'Failed'}'),
-                    backgroundColor: success ? Colors.green : Colors.red,
-                  ),
-                );
-                
-                if (success && mounted) {
-                  _loadOrderData();
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isDriving ? Colors.green : const Color(0xFF0A1A2B),
-                foregroundColor: Colors.white,
-              ),
-              child: Text(isDriving ? 'Complete' : 'Pick Up'),
-            ),
-          ],
         );
-      },
-    );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _makePhoneCall(String? phoneNumber) async {
+    if (phoneNumber == null || phoneNumber.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No phone number available'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    final String url = 'tel:$phoneNumber';
+    try {
+      if (await canLaunchUrl(Uri.parse(url))) {
+        await launchUrl(Uri.parse(url));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not make call'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override

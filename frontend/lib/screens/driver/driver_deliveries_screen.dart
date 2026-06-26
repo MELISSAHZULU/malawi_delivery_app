@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../providers/driver_provider.dart';
 import '../../utils/formatters.dart';
 import '../../routes/app_routes.dart';
+import '../../models/order.dart';
 
 class DriverDeliveriesScreen extends StatefulWidget {
   const DriverDeliveriesScreen({Key? key}) : super(key: key);
@@ -47,6 +48,12 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pushReplacementNamed(context, AppRoutes.driverHome);
+          },
+        ),
         title: const Text('My Deliveries'),
         backgroundColor: Colors.white,
         elevation: 0,
@@ -77,6 +84,19 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                         'You\'ll see deliveries here when assigned',
                         style: TextStyle(color: Colors.grey.shade500),
                       ),
+                      const SizedBox(height: 24),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pushReplacementNamed(context, AppRoutes.driverHome);
+                        },
+                        icon: const Icon(Icons.arrow_back),
+                        label: const Text('Go to Dashboard'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0A1A2B),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                      ),
                     ],
                   ),
                 )
@@ -93,7 +113,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
     );
   }
 
-  Widget _buildDeliveryCard(dynamic order) {
+  Widget _buildDeliveryCard(Order order) {
     final status = order.status?.toLowerCase() ?? 'pending';
 
     final isPending = status == 'pending' || status == 'accepted' ||
@@ -115,10 +135,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
       order.deliveryLongitude,
     );
 
-    int itemCount = 0;
-    try {
-      if (order.items != null && order.items is List) itemCount = order.items.length;
-    } catch (_) {}
+    int itemCount = order.items.length;
 
     Color getStatusColor() {
       if (isDelivered) return Colors.green;
@@ -400,14 +417,16 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                   ),
                 const SizedBox(width: 8),
                 
-                // Details button - PASS THE ORDER PROPERLY
+                // Details button - ✅ FIXED: Pass order.toJson() directly
                 OutlinedButton.icon(
                   onPressed: () {
-                    // Pass the entire order data
+                    // Convert order to JSON map and pass directly (not wrapped)
+                    final orderData = order.toJson();
+                    print('📤 Navigating to delivery detail with order: ${orderData['order_number']}');
                     Navigator.pushNamed(
                       context,
                       AppRoutes.deliveryDetail,
-                      arguments: order, // Pass the order object directly
+                      arguments: orderData,
                     );
                   },
                   icon: const Icon(Icons.info_outline, size: 18),
@@ -494,7 +513,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
     }
   }
 
-  void _showPickupDialog(BuildContext context, dynamic order) {
+  void _showPickupDialog(BuildContext context, Order order) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -546,7 +565,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
     );
   }
 
-  void _showDeliveryCompleteDialog(BuildContext context, dynamic order) {
+  void _showDeliveryCompleteDialog(BuildContext context, Order order) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
