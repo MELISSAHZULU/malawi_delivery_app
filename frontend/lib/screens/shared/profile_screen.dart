@@ -24,10 +24,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('Profile'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pushReplacementNamed(context, AppRoutes.buyerHome);
+          },
+        ),
+        title: const Text(
+          'Profile',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         backgroundColor: Colors.white,
         elevation: 0,
+        foregroundColor: const Color(0xFF0A1A2B),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
@@ -298,6 +312,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildStatCard(String label, String value, IconData icon) {
     return Expanded(
       child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: Colors.grey.shade200),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -332,7 +351,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     menuItems.add(_buildMenuItem(
       Icons.history,
       'Order History',
-      () => Navigator.pushNamed(context, AppRoutes.orderHistory),
+      () => Navigator.pushReplacementNamed(context, AppRoutes.orderHistory),
     ));
 
     // Buyer-specific menu items
@@ -373,7 +392,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       menuItems.add(_buildMenuItem(
         Icons.route,
         'Delivery History',
-        () => {},
+        () => Navigator.pushNamed(context, AppRoutes.deliveries),
       ));
       menuItems.add(_buildMenuItem(
         Icons.attach_money,
@@ -403,35 +422,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
           final confirm = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
-              title: const Text('Logout'),
-              content: const Text('Are you sure you want to logout?'),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: const Text(
+                'Logout',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              content: const Text(
+                'Are you sure you want to logout?',
+                style: TextStyle(fontSize: 14),
+              ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context, true),
                   child: const Text(
-                    'Logout',
-                    style: TextStyle(color: Colors.red),
+                    'Cancel',
+                    style: TextStyle(color: Colors.grey),
                   ),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(context, true);
+                    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                    await authProvider.logout();
+                    if (context.mounted) {
+                      Navigator.pushNamedAndRemoveUntil(
+                        context,
+                        AppRoutes.login,
+                        (route) => false,
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('Logout'),
                 ),
               ],
             ),
           );
-
-          if (confirm == true && context.mounted) {
-            final authProvider = Provider.of<AuthProvider>(context, listen: false);
-            await authProvider.logout();
-            if (context.mounted) {
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                AppRoutes.login,
-                (route) => false,
-              );
-            }
-          }
         },
         isDestructive: true,
       ),
@@ -455,10 +491,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title,
         style: TextStyle(
           color: isDestructive ? Colors.red : null,
+          fontWeight: FontWeight.w500,
         ),
       ),
-      trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+      trailing: Icon(
+        Icons.chevron_right,
+        color: Colors.grey.shade400,
+        size: 20,
+      ),
       onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
     );
   }
 

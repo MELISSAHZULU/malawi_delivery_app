@@ -109,6 +109,10 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.history),
             label: 'Orders',
           ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            label: 'Profile',
+          ),
         ],
         onTap: (index) {
           setState(() => _currentIndex = index);
@@ -120,6 +124,11 @@ class _HomeScreenState extends State<HomeScreen> {
             Navigator.pushReplacementNamed(
               context,
               AppRoutes.orderHistory,
+            );
+          } else if (index == 3) {
+            Navigator.pushReplacementNamed(
+              context,
+              AppRoutes.profile,
             );
           }
         },
