@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../providers/driver_provider.dart';
 import '../../utils/formatters.dart';
+import '../../models/order.dart';
 
 class DeliveryDetailScreen extends StatefulWidget {
   final dynamic order;
@@ -17,9 +18,8 @@ class DeliveryDetailScreen extends StatefulWidget {
 
 class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
   final MapController _mapController = MapController();
-  Map<String, dynamic>? _orderData;
+  Order? _order;
   bool _isLoading = true;
-  String _orderId = '';
 
   // Default coordinates (Lilongwe, Malawi)
   static const LatLng _defaultLocation = LatLng(-13.9626, 33.7741);
@@ -53,107 +53,96 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
       
       if (orderData == null) {
         print('❌ No order data found');
-        _orderData = null;
+        _order = null;
         return;
       }
       
       print('📦 Order data type: ${orderData.runtimeType}');
       
-      if (orderData is Map) {
-        Map<String, dynamic> dataMap = {};
-        orderData.forEach((key, value) {
-          dataMap[key.toString()] = value;
-        });
-        
-        print('📦 Data map keys: ${dataMap.keys}');
-        
-        if (dataMap.containsKey('order') && dataMap['order'] is Map) {
-          final wrapped = dataMap['order'] as Map;
-          Map<String, dynamic> wrappedMap = {};
-          wrapped.forEach((key, value) {
-            wrappedMap[key.toString()] = value;
-          });
-          _orderData = wrappedMap;
-          _orderId = wrappedMap['id']?.toString() ?? '';
-          print('✅ Extracted wrapped order data');
-        } 
-        else if (dataMap.containsKey('order_details') && dataMap['order_details'] is Map) {
-          final details = dataMap['order_details'] as Map;
-          Map<String, dynamic> detailsMap = {};
-          details.forEach((key, value) {
-            detailsMap[key.toString()] = value;
+      // If it's already an Order object
+      if (orderData is Order) {
+        _order = orderData;
+        print('✅ Using Order object directly: ${_order?.orderNumber}');
+      } 
+      // If it's a Map
+      else if (orderData is Map) {
+        // Convert to Order using fromJson
+        try {
+          // Handle different map structures
+          Map<String, dynamic> dataMap = {};
+          orderData.forEach((key, value) {
+            dataMap[key.toString()] = value;
           });
           
-          detailsMap['assignment_id'] = dataMap['id']?.toString();
-          detailsMap['driver_name'] = dataMap['driver_name'];
-          detailsMap['driver_phone'] = dataMap['driver_phone'];
-          detailsMap['seller_name'] = dataMap['seller_name'] ?? detailsMap['seller_name'];
-          detailsMap['delivery_address'] = dataMap['delivery_address'] ?? detailsMap['delivery_address'];
-          detailsMap['customer_name'] = dataMap['customer_name'] ?? detailsMap['customer_name'] ?? detailsMap['buyer_name'];
-          detailsMap['customer_phone'] = dataMap['customer_phone'] ?? detailsMap['customer_phone'] ?? detailsMap['buyer_phone'];
+          print('📦 Data map keys: ${dataMap.keys}');
           
-          if (dataMap.containsKey('status')) {
-            detailsMap['status'] = dataMap['status'].toString();
-            print('✅ Using assignment status: ${dataMap['status']}');
+          // Check if it has order_details (nested data from assignment)
+          if (dataMap.containsKey('order_details') && dataMap['order_details'] is Map) {
+            final details = dataMap['order_details'] as Map;
+            Map<String, dynamic> detailsMap = {};
+            details.forEach((key, value) {
+              detailsMap[key.toString()] = value;
+            });
+            
+            // Add assignment data
+            detailsMap['assignment_id'] = dataMap['id']?.toString();
+            detailsMap['driver_name'] = dataMap['driver_name'];
+            detailsMap['driver_phone'] = dataMap['driver_phone'];
+            detailsMap['seller_name'] = dataMap['seller_name'] ?? detailsMap['seller_name'];
+            detailsMap['delivery_address'] = dataMap['delivery_address'] ?? detailsMap['delivery_address'];
+            detailsMap['customer_name'] = dataMap['customer_name'] ?? detailsMap['customer_name'] ?? detailsMap['buyer_name'];
+            detailsMap['customer_phone'] = dataMap['customer_phone'] ?? detailsMap['customer_phone'] ?? detailsMap['buyer_phone'];
+            detailsMap['seller_latitude'] = dataMap['seller_latitude'] ?? detailsMap['seller_latitude'];
+            detailsMap['seller_longitude'] = dataMap['seller_longitude'] ?? detailsMap['seller_longitude'];
+            detailsMap['delivery_latitude'] = dataMap['delivery_latitude'] ?? detailsMap['delivery_latitude'];
+            detailsMap['delivery_longitude'] = dataMap['delivery_longitude'] ?? detailsMap['delivery_longitude'];
+            
+            // Use assignment status
+            if (dataMap.containsKey('status')) {
+              detailsMap['status'] = dataMap['status'].toString();
+              print('✅ Using assignment status: ${dataMap['status']}');
+            }
+            
+            _order = Order.fromJson(detailsMap);
+            print('✅ Extracted order_details: ${_order?.orderNumber}');
+          } else {
+            // Direct order data
+            _order = Order.fromJson(dataMap);
+            print('✅ Using order data directly: ${_order?.orderNumber}');
           }
           
-          _orderData = detailsMap;
-          _orderId = dataMap['id']?.toString() ?? '';
-          print('✅ Extracted order_details');
-        } else {
-          _orderData = dataMap;
-          _orderId = dataMap['id']?.toString() ?? '';
-          print('✅ Using order data directly');
-        }
-        
-        if (_orderData != null) {
-          print('🔑 ALL KEYS: ${_orderData!.keys.toList()}');
-          print('🆔 id value: ${_orderData!['id']}');
-          print('👤 customer_name: ${_orderData!['customer_name']}');
-          print('🏪 seller_name: ${_orderData!['seller_name']}');
-          print('📍 delivery_address: ${_orderData!['delivery_address']}');
-        }
-        
-        if (_orderId.isEmpty || _orderId == 'null' || _orderId == '0') {
-          if (_orderData!.containsKey('assignment_id')) {
-            _orderId = _orderData!['assignment_id'].toString();
-          } else if (_orderData!.containsKey('order_id')) {
-            _orderId = _orderData!['order_id'].toString();
-          } else if (_orderData!.containsKey('id')) {
-            _orderId = _orderData!['id'].toString();
+          // Print debug info
+          if (_order != null) {
+            print('🔑 Order Number: ${_order?.orderNumber}');
+            print('👤 Customer Name: ${_order?.customerName}');
+            print('🏪 Seller Name: ${_order?.sellerName}');
+            print('📍 Delivery Address: ${_order?.deliveryAddress}');
+            print('📦 Status: ${_order?.status}');
+            print('🆔 ID: ${_order?.id}');
           }
+          
+        } catch (e) {
+          print('❌ Error parsing order from map: $e');
+          _order = null;
         }
-        
-        print('✅ Final Order ID: $_orderId');
-        
-      } else if (orderData is String) {
+      } 
+      // If it's a String ID
+      else if (orderData is String) {
         final driverProvider = Provider.of<DriverProvider>(context, listen: false);
         final found = driverProvider.getOrderById(orderData);
         if (found != null) {
-          _orderData = found.toJson();
-          _orderId = orderData;
-          print('✅ Found order by ID: ${_orderData?['order_number']}');
+          _order = found;
+          print('✅ Found order by ID: ${_order?.orderNumber}');
         } else {
           print('❌ Order not found with ID: $orderData');
-          _orderData = null;
+          _order = null;
         }
       } else {
-        try {
-          final map = orderData.toJson() as Map;
-          Map<String, dynamic> dataMap = {};
-          map.forEach((key, value) {
-            dataMap[key.toString()] = value;
-          });
-          _orderData = dataMap;
-          _orderId = dataMap['id']?.toString() ?? '';
-          print('✅ Converted order to map: ${_orderData?['order_number']}');
-        } catch (e) {
-          print('❌ Could not convert order: $e');
-          _orderData = null;
-        }
+        print('❌ Unexpected data type: ${orderData.runtimeType}');
+        _order = null;
       }
       
-      if (_orderData != null) {
+      if (_order != null) {
         _setupLocations();
         print('✅ Order loaded successfully');
       } else {
@@ -161,7 +150,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
       }
     } catch (e) {
       print('❌ Error loading order: $e');
-      _orderData = null;
+      _order = null;
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -171,25 +160,23 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
 
   void _setupLocations() {
     try {
-      if (_orderData == null) return;
+      if (_order == null) return;
       
-      final sellerLat = _orderData?['seller_latitude'] ?? _orderData?['sellerLatitude'];
-      final sellerLng = _orderData?['seller_longitude'] ?? _orderData?['sellerLongitude'];
-      final deliveryLat = _orderData?['delivery_latitude'] ?? _orderData?['deliveryLatitude'];
-      final deliveryLng = _orderData?['delivery_longitude'] ?? _orderData?['deliveryLongitude'];
-      
-      if (sellerLat != null && sellerLng != null) {
+      // Get location data from order
+      if (_order!.sellerLatitude != null && _order!.sellerLongitude != null) {
         _pickupLocation = LatLng(
-          double.parse(sellerLat.toString()),
-          double.parse(sellerLng.toString()),
+          _order!.sellerLatitude!,
+          _order!.sellerLongitude!,
         );
+        print('📍 Pickup location set: ${_order!.sellerLatitude}, ${_order!.sellerLongitude}');
       }
       
-      if (deliveryLat != null && deliveryLng != null) {
+      if (_order!.deliveryLatitude != null && _order!.deliveryLongitude != null) {
         _deliveryLocation = LatLng(
-          double.parse(deliveryLat.toString()),
-          double.parse(deliveryLng.toString()),
+          _order!.deliveryLatitude!,
+          _order!.deliveryLongitude!,
         );
+        print('📍 Delivery location set: ${_order!.deliveryLatitude}, ${_order!.deliveryLongitude}');
       }
     } catch (e) {
       print('Error setting up locations: $e');
@@ -208,83 +195,6 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     );
   }
 
-  String _getValue(String key, {String defaultValue = ''}) {
-    if (_orderData == null) return defaultValue;
-    
-    if (_orderData!.containsKey(key) && _orderData![key] != null) {
-      return _orderData![key].toString();
-    }
-    
-    final camelKey = _toCamelCase(key);
-    if (_orderData!.containsKey(camelKey) && _orderData![camelKey] != null) {
-      return _orderData![camelKey].toString();
-    }
-    
-    return defaultValue;
-  }
-
-  String _toCamelCase(String snake) {
-    final parts = snake.split('_');
-    if (parts.length <= 1) return snake;
-    return parts.first + parts.skip(1).map((p) => p[0].toUpperCase() + p.substring(1)).join('');
-  }
-
-  String _getOrderNumber() {
-    return _getValue('order_number', defaultValue: 'N/A');
-  }
-
-  String _getStatus() {
-    final assignmentStatus = _getValue('status');
-    if (assignmentStatus.isNotEmpty && assignmentStatus != 'pending') {
-      return assignmentStatus;
-    }
-    return _getValue('order_status', defaultValue: 'pending');
-  }
-
-  String _getSellerName() {
-    return _getValue('seller_name', defaultValue: 'Store');
-  }
-
-  String _getSellerAddress() {
-    return _getValue('seller_address', defaultValue: '');
-  }
-
-  String _getDeliveryAddress() {
-    return _getValue('delivery_address', defaultValue: 'Delivery location');
-  }
-
-  String _getCustomerName() {
-    final name = _getValue('customer_name');
-    if (name.isNotEmpty) return name;
-    return _getValue('buyer_name', defaultValue: 'Customer');
-  }
-
-  String _getCustomerPhone() {
-    final phone = _getValue('customer_phone');
-    if (phone.isNotEmpty) return phone;
-    return _getValue('buyer_phone', defaultValue: '');
-  }
-
-  double _getDeliveryFee() {
-    if (_orderData == null) return 1500.0;
-    
-    if (_orderData!.containsKey('delivery_fee')) {
-      final value = _orderData!['delivery_fee'];
-      if (value is double) return value;
-      if (value is int) return value.toDouble();
-      if (value is String) return double.tryParse(value) ?? 1500.0;
-    }
-    
-    if (_orderData!.containsKey('deliveryFee')) {
-      final value = _orderData!['deliveryFee'];
-      if (value is double) return value;
-      if (value is int) return value.toDouble();
-      if (value is String) return double.tryParse(value) ?? 1500.0;
-    }
-    
-    return 1500.0;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -297,17 +207,17 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.phone, color: Colors.green),
-            onPressed: () => _makePhoneCall(_getCustomerPhone()),
+            onPressed: () => _makePhoneCall(_order?.customerPhone),
           ),
           IconButton(
             icon: const Icon(Icons.navigation, color: Colors.blue),
-            onPressed: () => _openGoogleMaps(_getDeliveryAddress()),
+            onPressed: () => _openGoogleMaps(_order?.deliveryAddress ?? ''),
           ),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _orderData == null
+          : _order == null
               ? _buildErrorState()
               : Column(
                   children: [
@@ -336,6 +246,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                           ),
                           MarkerLayer(
                             markers: [
+                              // Pickup marker (blue - store)
                               Marker(
                                 point: _pickupLocation,
                                 width: 40,
@@ -346,6 +257,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                                   size: 36,
                                 ),
                               ),
+                              // Delivery marker (green - customer)
                               Marker(
                                 point: _deliveryLocation,
                                 width: 40,
@@ -387,7 +299,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    'Order #${_getOrderNumber()}',
+                                    'Order #${_order?.orderNumber ?? 'N/A'}',
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
@@ -407,7 +319,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                                         Icon(Icons.motorcycle, size: 14, color: Colors.green.shade700),
                                         const SizedBox(width: 4),
                                         Text(
-                                          'Fee: ${Formatters.currencyFormat(_getDeliveryFee())}',
+                                          'Fee: ${Formatters.currencyFormat(_order?.deliveryFee ?? 0)}',
                                           style: const TextStyle(
                                             fontSize: 14,
                                             fontWeight: FontWeight.bold,
@@ -420,77 +332,135 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                                 ],
                               ),
                               const SizedBox(height: 12),
+                              
+                              // Seller info with name and address
                               _buildLocationRow(
                                 icon: Icons.storefront,
                                 iconColor: Colors.blue,
                                 title: 'Pickup from',
-                                subtitle: _getSellerName(),
-                                address: _getSellerAddress().isNotEmpty ? _getSellerAddress() : 'Pickup location',
+                                subtitle: _order?.sellerName ?? 'Store',
+                                address: _order?.sellerAddress ?? 'Pickup location',
                               ),
                               const SizedBox(height: 8),
+                              
+                              // Customer info with name and address
                               _buildLocationRow(
                                 icon: Icons.location_on,
                                 iconColor: Colors.green,
                                 title: 'Deliver to',
-                                subtitle: _getCustomerName(),
-                                address: _getDeliveryAddress(),
+                                subtitle: _order?.customerName ?? 'Customer',
+                                address: _order?.deliveryAddress ?? 'Delivery location',
                               ),
                               const SizedBox(height: 12),
                               
                               const Divider(),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                              
+                              // Customer details section
+                              Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Customer Details',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF0A1A2B),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
                                       children: [
-                                        const Text('Customer',
-                                            style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey)),
-                                        const SizedBox(height: 4),
+                                        const Icon(Icons.person, size: 16, color: Colors.grey),
+                                        const SizedBox(width: 8),
                                         Text(
-                                          _getCustomerName(),
+                                          _order?.customerName ?? 'Customer',
                                           style: const TextStyle(
-                                              fontWeight: FontWeight.w500),
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: 14,
+                                          ),
                                         ),
-                                        if (_getCustomerPhone().isNotEmpty) ...[
-                                          const SizedBox(height: 4),
+                                      ],
+                                    ),
+                                    if (_order?.customerPhone != null && _order!.customerPhone!.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.phone, size: 16, color: Colors.grey),
+                                          const SizedBox(width: 8),
                                           InkWell(
-                                            onTap: () => _makePhoneCall(_getCustomerPhone()),
+                                            onTap: () => _makePhoneCall(_order?.customerPhone),
                                             child: Text(
-                                              _getCustomerPhone(),
+                                              _order!.customerPhone!,
                                               style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors.blue.shade700),
+                                                fontSize: 14,
+                                                color: Colors.blue.shade700,
+                                              ),
                                             ),
                                           ),
                                         ],
-                                      ],
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              
+                              const Divider(),
+                              
+                              // Seller details section
+                              Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Seller Details',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF0A1A2B),
+                                      ),
                                     ),
-                                  ),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                    const SizedBox(height: 8),
+                                    Row(
                                       children: [
-                                        const Text('Seller',
-                                            style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey)),
-                                        const SizedBox(height: 4),
+                                        const Icon(Icons.store, size: 16, color: Colors.grey),
+                                        const SizedBox(width: 8),
                                         Text(
-                                          _getSellerName(),
+                                          _order?.sellerName ?? 'Store',
                                           style: const TextStyle(
-                                              fontWeight: FontWeight.w500),
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: 14,
+                                          ),
                                         ),
                                       ],
                                     ),
-                                  ),
-                                ],
+                                    if (_order?.sellerAddress != null && _order!.sellerAddress!.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              _order!.sellerAddress!,
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                color: Colors.grey.shade600,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ],
+                                ),
                               ),
-                              const SizedBox(height: 12),
                               
-                              // ✅ Only Navigate button - no action buttons
+                              const Divider(),
+                              
+                              // ✅ Only Navigate button
                               _buildNavigateButton(),
                             ],
                           ),
@@ -545,7 +515,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
   }
 
   Widget _buildStatusHeader() {
-    final status = _getStatus();
+    final status = _order?.effectiveStatus ?? 'pending';
     final isDelivered = status == 'delivered' || status == 'completed';
     final isDriving = status == 'driving' || status == 'picked_up';
     final isPending = status == 'pending' || status == 'accepted' || status == 'confirmed' || status == 'ready';
@@ -620,12 +590,25 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-              Text(subtitle,
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-              Text(address,
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade700)),
+              Text(
+                title,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              ),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
+              ),
+              if (address.isNotEmpty)
+                Text(
+                  address,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
             ],
           ),
         ),
@@ -633,12 +616,11 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     );
   }
 
-  // ✅ Only Navigate button - no action buttons
   Widget _buildNavigateButton() {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
-        onPressed: () => _openGoogleMaps(_getDeliveryAddress()),
+        onPressed: () => _openGoogleMaps(_order?.deliveryAddress ?? ''),
         icon: const Icon(Icons.navigation),
         label: const Text('Navigate to Delivery Location'),
         style: OutlinedButton.styleFrom(
