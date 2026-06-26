@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../providers/driver_provider.dart';
 import '../../utils/formatters.dart';
 import '../../routes/app_routes.dart';
-import '../../models/order.dart';
 
 class DriverDeliveriesScreen extends StatefulWidget {
   const DriverDeliveriesScreen({Key? key}) : super(key: key);
@@ -26,7 +25,6 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
     await Provider.of<DriverProvider>(context, listen: false).fetchAssignedOrders();
   }
 
-  // Calculate distance in km between two coordinates using Haversine formula
   double? _calculateDistance(double? lat1, double? lon1, double? lat2, double? lon2) {
     if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return null;
     const R = 6371.0;
@@ -345,12 +343,12 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
             ),
           ),
 
-          // Action Buttons with correct logic
+          // Action Buttons
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Row(
               children: [
-                // Show "Complete Delivery" for driving orders → sends 'deliver'
+                // Show "Complete Delivery" for driving orders
                 if (isDriving)
                   Expanded(
                     child: ElevatedButton.icon(
@@ -365,7 +363,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                       ),
                     ),
                   )
-                // Show "Pick Up Order" for picked up or pending orders → sends 'pick_up'
+                // Show "Pick Up Order" for picked up or pending orders
                 else if (isPickedUp || isPending)
                   Expanded(
                     child: ElevatedButton.icon(
@@ -402,13 +400,14 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                   ),
                 const SizedBox(width: 8),
                 
-                // Details button
+                // Details button - PASS THE ORDER PROPERLY
                 OutlinedButton.icon(
                   onPressed: () {
+                    // Pass the entire order data
                     Navigator.pushNamed(
                       context,
                       AppRoutes.deliveryDetail,
-                      arguments: {'order': order},
+                      arguments: order, // Pass the order object directly
                     );
                   },
                   icon: const Icon(Icons.info_outline, size: 18),
@@ -434,13 +433,12 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
 
     int currentStep = 0;
     if (status == 'picked_up') currentStep = 1;
-    if (status == 'driving') currentStep = 1; // still step 1, just further along
+    if (status == 'driving') currentStep = 1;
     if (status == 'delivered') currentStep = 2;
 
     return Row(
       children: List.generate(steps.length * 2 - 1, (i) {
         if (i.isOdd) {
-          // Connector line
           final filled = (i ~/ 2) < currentStep;
           return Expanded(
             child: Container(
@@ -496,7 +494,6 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
     }
   }
 
-  // ✅ FIXED: _showPickupDialog with ScaffoldMessenger saved before async
   void _showPickupDialog(BuildContext context, dynamic order) {
     showDialog(
       context: context,
@@ -526,28 +523,17 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
-              // Close the dialog first
               Navigator.pop(context);
-              
-              // Get the provider
               final driverProvider = Provider.of<DriverProvider>(context, listen: false);
-              
-              // ✅ Save ScaffoldMessenger before async call
               final messenger = ScaffoldMessenger.of(context);
-              
-              // Perform async operation
               final success = await driverProvider.updateDeliveryStatus(
                 order.id.toString(),
                 'pick_up',
               );
-              
-              // Use saved messenger to show SnackBar
               messenger.showSnackBar(SnackBar(
                 content: Text(success ? '✅ Order picked up successfully' : '❌ ${driverProvider.error ?? 'Failed'}'),
                 backgroundColor: success ? Colors.green : Colors.red,
               ));
-              
-              // Reload if successful
               if (success && mounted) {
                 await _loadDeliveries();
               }
@@ -560,7 +546,6 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
     );
   }
 
-  // ✅ FIXED: _showDeliveryCompleteDialog with ScaffoldMessenger saved before async
   void _showDeliveryCompleteDialog(BuildContext context, dynamic order) {
     showDialog(
       context: context,
@@ -590,28 +575,17 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
-              // Close the dialog first
               Navigator.pop(context);
-              
-              // Get the provider
               final driverProvider = Provider.of<DriverProvider>(context, listen: false);
-              
-              // ✅ Save ScaffoldMessenger before async call
               final messenger = ScaffoldMessenger.of(context);
-              
-              // Perform async operation
               final success = await driverProvider.updateDeliveryStatus(
                 order.id.toString(),
                 'deliver',
               );
-              
-              // Use saved messenger to show SnackBar
               messenger.showSnackBar(SnackBar(
                 content: Text(success ? '✅ Delivery completed! 🎉' : '❌ ${driverProvider.error ?? 'Failed'}'),
                 backgroundColor: success ? Colors.green : Colors.red,
               ));
-              
-              // Reload if successful
               if (success && mounted) {
                 await _loadDeliveries();
               }

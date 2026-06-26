@@ -7,7 +7,9 @@ import '../../providers/driver_provider.dart';
 import '../../utils/formatters.dart';
 
 class DeliveryDetailScreen extends StatefulWidget {
-  const DeliveryDetailScreen({Key? key}) : super(key: key);
+  final dynamic order;
+  
+  const DeliveryDetailScreen({Key? key, this.order}) : super(key: key);
 
   @override
   State<DeliveryDetailScreen> createState() => _DeliveryDetailScreenState();
@@ -15,17 +17,20 @@ class DeliveryDetailScreen extends StatefulWidget {
 
 class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
   final MapController _mapController = MapController();
-  dynamic order;
+  dynamic _order;
   bool _isLoading = true;
 
   // Default coordinates (Lilongwe, Malawi)
   static const LatLng _defaultLocation = LatLng(-13.9626, 33.7741);
 
   LatLng _pickupLocation = _defaultLocation;
-  LatLng _deliveryLocation = LatLng(
-    _defaultLocation.latitude + 0.01,
-    _defaultLocation.longitude + 0.01,
-  );
+  LatLng _deliveryLocation = _defaultLocation;
+
+  @override
+  void initState() {
+    super.initState();
+    _isLoading = true;
+  }
 
   @override
   void didChangeDependencies() {
@@ -33,61 +38,126 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     _loadOrderData();
   }
 
-  // ✅ UPDATED: Cleaner _loadOrderData method
   void _loadOrderData() {
-    final args = ModalRoute.of(context)?.settings.arguments;
-
-    // Handle different argument types
-    if (args is Map) {
-      order = args['order'];
-    } else if (args != null) {
-      order = args;
-    }
-
-    // If order was passed as a String ID, fetch it from provider
-    if (order is String) {
-      final driverProvider = Provider.of<DriverProvider>(context, listen: false);
-      final results = driverProvider.assignedOrders
-          .where((o) => o.id.toString() == order);
-      if (results.isNotEmpty) {
-        order = results.first;
-        print('✅ Found order by ID: ${order.orderNumber}');
+    setState(() => _isLoading = true);
+    
+    try {
+      // Check if order was passed directly to widget
+      if (widget.order != null) {
+        _order = widget.order;
+        print('✅ Order loaded from widget');
       } else {
-        print('❌ Order not found with ID: $order');
+        // Try to get from route arguments
+        final args = ModalRoute.of(context)?.settings.arguments;
+        print('📦 Route arguments: $args');
+        
+        if (args != null) {
+          // Handle different argument types
+          if (args is Map) {
+            // Check if it has order_details (from assignment API)
+            if (args.containsKey('order_details')) {
+              _order = args['order_details'];
+              print('✅ Extracted order_details from map');
+            } else if (args.containsKey('order')) {
+              _order = args['order'];
+              print('✅ Extracted order from map');
+            } else {
+              // Try to use the map itself as order data
+              _order = args;
+              print('✅ Using args map as order data');
+            }
+          } else if (args is String) {
+            // If it's a string ID, find the order
+            final driverProvider = Provider.of<DriverProvider>(context, listen: false);
+            final results = driverProvider.assignedOrders
+                .where((o) => o.id.toString() == args || o.orderNumber == args);
+            if (results.isNotEmpty) {
+              _order = results.first;
+              print('✅ Found order by ID: ${_order.orderNumber}');
+            } else {
+              print('❌ Order not found with ID: $args');
+              _order = null;
+            }
+          } else {
+            _order = args;
+            print('✅ Using args directly');
+          }
+        }
+      }
+      
+      // If order is a Map and has id but no order_number, try to find it
+      if (_order is Map && _order.containsKey('id') && !_order.containsKey('order_number')) {
+        final driverProvider = Provider.of<DriverProvider>(context, listen: false);
+        final orderId = _order['id'].toString();
+        final results = driverProvider.assignedOrders
+            .where((o) => o.id.toString() == orderId);
+        if (results.isNotEmpty) {
+          _order = results.first;
+          print('✅ Found order by ID from map: ${_order.orderNumber}');
+        }
+      }
+      
+      if (_order != null) {
+        _setupLocations();
+        print('✅ Order loaded successfully');
+        print('📦 Order data: $_order');
+      } else {
+        print('❌ Order is null after loading');
+      }
+    } catch (e) {
+      print('❌ Error loading order: $e');
+      _order = null;
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
-
-    if (order != null) {
-      _setupLocations();
-      print('✅ Order loaded: ${order.orderNumber}');
-    } else {
-      print('❌ Order is null after loading');
-    }
-
-    _isLoading = false;
-    setState(() {});
   }
 
   void _setupLocations() {
     try {
-      if (order.sellerLatitude != null && order.sellerLongitude != null) {
-        _pickupLocation = LatLng(
-          double.parse(order.sellerLatitude.toString()),
-          double.parse(order.sellerLongitude.toString()),
-        );
+      // Handle both Map and Order object
+      final isMap = _order is Map;
+      
+      if (isMap) {
+        // Handle Map data
+        final sellerLat = _order['seller_latitude'] ?? _order['sellerLatitude'];
+        final sellerLng = _order['seller_longitude'] ?? _order['sellerLongitude'];
+        final deliveryLat = _order['delivery_latitude'] ?? _order['deliveryLatitude'];
+        final deliveryLng = _order['delivery_longitude'] ?? _order['deliveryLongitude'];
+        
+        if (sellerLat != null && sellerLng != null) {
+          _pickupLocation = LatLng(
+            double.parse(sellerLat.toString()),
+            double.parse(sellerLng.toString()),
+          );
+        }
+        
+        if (deliveryLat != null && deliveryLng != null) {
+          _deliveryLocation = LatLng(
+            double.parse(deliveryLat.toString()),
+            double.parse(deliveryLng.toString()),
+          );
+        }
+      } else {
+        // Handle Order object
+        if (_order.sellerLatitude != null && _order.sellerLongitude != null) {
+          _pickupLocation = LatLng(
+            _order.sellerLatitude,
+            _order.sellerLongitude,
+          );
+        }
+        
+        if (_order.deliveryLatitude != null && _order.deliveryLongitude != null) {
+          _deliveryLocation = LatLng(
+            _order.deliveryLatitude,
+            _order.deliveryLongitude,
+          );
+        }
       }
     } catch (e) {
+      print('Error setting up locations: $e');
       _pickupLocation = _defaultLocation;
-    }
-
-    try {
-      if (order.deliveryLatitude != null && order.deliveryLongitude != null) {
-        _deliveryLocation = LatLng(
-          double.parse(order.deliveryLatitude.toString()),
-          double.parse(order.deliveryLongitude.toString()),
-        );
-      }
-    } catch (e) {
       _deliveryLocation = LatLng(
         _defaultLocation.latitude + 0.01,
         _defaultLocation.longitude + 0.01,
@@ -95,15 +165,16 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     }
   }
 
-  LatLng get _mapCenter => LatLng(
-        (_pickupLocation.latitude + _deliveryLocation.latitude) / 2,
-        (_pickupLocation.longitude + _deliveryLocation.longitude) / 2,
-      );
+  LatLng get _mapCenter {
+    return LatLng(
+      (_pickupLocation.latitude + _deliveryLocation.latitude) / 2,
+      (_pickupLocation.longitude + _deliveryLocation.longitude) / 2,
+    );
+  }
 
   Future<void> _openGoogleMaps(String address) async {
     final String encodedAddress = Uri.encodeComponent(address);
-    final String url =
-        'https://www.google.com/maps/dir/?api=1&destination=$encodedAddress';
+    final String url = 'https://www.google.com/maps/dir/?api=1&destination=$encodedAddress';
     try {
       if (await canLaunchUrl(Uri.parse(url))) {
         await launchUrl(Uri.parse(url));
@@ -157,6 +228,68 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     }
   }
 
+  // Helper to get value from order (handles both Map and Object)
+  dynamic _getOrderValue(String key, {dynamic defaultValue}) {
+    if (_order == null) return defaultValue;
+    if (_order is Map) {
+      return _order[key] ?? defaultValue;
+    }
+    // Try to get property from object
+    try {
+      return _order[key] ?? defaultValue;
+    } catch (_) {
+      return defaultValue;
+    }
+  }
+
+  String _getOrderNumber() {
+    return _getOrderValue('order_number', defaultValue: 'N/A') ?? 'N/A';
+  }
+
+  String _getStatus() {
+    return _getOrderValue('status', defaultValue: 'pending') ?? 'pending';
+  }
+
+  String _getSellerName() {
+    return _getOrderValue('seller_name', defaultValue: 'Store') ?? 'Store';
+  }
+
+  String _getSellerAddress() {
+    return _getOrderValue('seller_address', defaultValue: 'Pickup location') ?? 'Pickup location';
+  }
+
+  String _getDeliveryAddress() {
+    return _getOrderValue('delivery_address', defaultValue: 'Delivery location') ?? 'Delivery location';
+  }
+
+  String _getCustomerName() {
+    return _getOrderValue('customer_name', defaultValue: 'Customer') ?? 'Customer';
+  }
+
+  String _getCustomerPhone() {
+    return _getOrderValue('customer_phone', defaultValue: '') ?? '';
+  }
+
+  String _getDriverName() {
+    return _getOrderValue('driver_name', defaultValue: 'Driver') ?? 'Driver';
+  }
+
+  String _getDriverPhone() {
+    return _getOrderValue('driver_phone', defaultValue: '') ?? '';
+  }
+
+  double _getTotal() {
+    final total = _getOrderValue('total', defaultValue: 0.0);
+    if (total is double) return total;
+    if (total is int) return total.toDouble();
+    if (total is String) return double.tryParse(total) ?? 0.0;
+    return 0.0;
+  }
+
+  List<dynamic> _getItems() {
+    return _getOrderValue('items', defaultValue: []) ?? [];
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -169,56 +302,18 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.phone, color: Colors.green),
-            onPressed: () => _makePhoneCall(order?.customerPhone),
+            onPressed: () => _makePhoneCall(_getCustomerPhone()),
           ),
           IconButton(
             icon: const Icon(Icons.navigation, color: Colors.blue),
-            onPressed: () => _openGoogleMaps(order?.deliveryAddress ?? ''),
+            onPressed: () => _openGoogleMaps(_getDeliveryAddress()),
           ),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : order == null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline, size: 60, color: Colors.grey.shade400),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Order not found',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Please go back and try again',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton.icon(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.arrow_back),
-                        label: const Text('Go Back'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0A1A2B),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
+          : _order == null
+              ? _buildErrorState()
               : Column(
                   children: [
                     // Map
@@ -232,8 +327,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                         ),
                         children: [
                           TileLayer(
-                            urlTemplate:
-                                'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                             userAgentPackageName: 'com.example.malawi_delivery',
                           ),
                           PolylineLayer(
@@ -297,12 +391,10 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                               _buildStatusHeader(),
                               const SizedBox(height: 8),
                               Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    order.orderNumber ??
-                                        'Order #${order.id ?? ''}',
+                                    'Order #${_getOrderNumber()}',
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
@@ -310,8 +402,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                                     ),
                                   ),
                                   Text(
-                                    Formatters.currencyFormat(
-                                        order.total ?? order.amount ?? 0),
+                                    Formatters.currencyFormat(_getTotal()),
                                     style: const TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
@@ -325,23 +416,19 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                                 icon: Icons.storefront,
                                 iconColor: Colors.blue,
                                 title: 'Pickup from',
-                                subtitle: order.sellerName ?? 'Store',
-                                address: order.sellerAddress ??
-                                    order.pickupAddress ??
-                                    'Pickup location',
+                                subtitle: _getSellerName(),
+                                address: _getSellerAddress(),
                               ),
                               const SizedBox(height: 8),
                               _buildLocationRow(
                                 icon: Icons.location_on,
                                 iconColor: Colors.green,
                                 title: 'Deliver to',
-                                subtitle: order.customerName ?? 'Customer',
-                                address: order.deliveryAddress ??
-                                    'Delivery location',
+                                subtitle: _getCustomerName(),
+                                address: _getDeliveryAddress(),
                               ),
                               const SizedBox(height: 12),
-                              if (order.items != null &&
-                                  order.items.isNotEmpty) ...[
+                              if (_getItems().isNotEmpty) ...[
                                 const Divider(),
                                 const Text(
                                   'Order Items',
@@ -351,11 +438,29 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 8),
-                                ...List.generate(
-                                  order.items.length,
-                                  (index) =>
-                                      _buildOrderItem(order.items[index]),
-                                ),
+                                ..._getItems().map((item) => Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          '${item['quantity'] ?? 0}x ${item['name'] ?? 'Item'}',
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                      ),
+                                      Text(
+                                        Formatters.currencyFormat(
+                                          (item['price'] ?? 0) * (item['quantity'] ?? 0)
+                                        ),
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )),
                               ],
                               const SizedBox(height: 8),
                               const Divider(),
@@ -363,8 +468,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                                 children: [
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         const Text('Customer',
                                             style: TextStyle(
@@ -372,21 +476,19 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                                                 color: Colors.grey)),
                                         const SizedBox(height: 4),
                                         Text(
-                                          order.customerName ?? 'Customer',
+                                          _getCustomerName(),
                                           style: const TextStyle(
                                               fontWeight: FontWeight.w500),
                                         ),
-                                        if (order.customerPhone != null) ...[
+                                        if (_getCustomerPhone().isNotEmpty) ...[
                                           const SizedBox(height: 4),
                                           InkWell(
-                                            onTap: () => _makePhoneCall(
-                                                order.customerPhone),
+                                            onTap: () => _makePhoneCall(_getCustomerPhone()),
                                             child: Text(
-                                              order.customerPhone,
+                                              _getCustomerPhone(),
                                               style: TextStyle(
                                                   fontSize: 12,
-                                                  color:
-                                                      Colors.blue.shade700),
+                                                  color: Colors.blue.shade700),
                                             ),
                                           ),
                                         ],
@@ -395,8 +497,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                                   ),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         const Text('Seller',
                                             style: TextStyle(
@@ -404,24 +505,10 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                                                 color: Colors.grey)),
                                         const SizedBox(height: 4),
                                         Text(
-                                          order.sellerName ?? 'Store',
+                                          _getSellerName(),
                                           style: const TextStyle(
                                               fontWeight: FontWeight.w500),
                                         ),
-                                        if (order.sellerPhone != null) ...[
-                                          const SizedBox(height: 4),
-                                          InkWell(
-                                            onTap: () => _makePhoneCall(
-                                                order.sellerPhone),
-                                            child: Text(
-                                              order.sellerPhone,
-                                              style: TextStyle(
-                                                  fontSize: 12,
-                                                  color:
-                                                      Colors.blue.shade700),
-                                            ),
-                                          ),
-                                        ],
                                       ],
                                     ),
                                   ),
@@ -439,29 +526,71 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     );
   }
 
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, size: 60, color: Colors.grey.shade400),
+          const SizedBox(height: 16),
+          Text(
+            'Order not found',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Please go back and try again',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.arrow_back),
+            label: const Text('Go Back'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0A1A2B),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatusHeader() {
-    final status = order.status?.toLowerCase() ?? 'pending';
-    final isPickedUp = status == 'picked_up' || status == 'in_transit' || status == 'driving';
+    final status = _getStatus();
     final isDelivered = status == 'delivered' || status == 'completed';
+    final isDriving = status == 'driving' || status == 'picked_up';
     final isPending = status == 'pending' || status == 'accepted' || status == 'confirmed' || status == 'ready';
 
     String getHeaderText() {
       if (isDelivered) return 'Delivery Completed 🎉';
-      if (isPickedUp) return 'Head to Customer';
+      if (isDriving) return 'Head to Customer';
       if (isPending) return 'Head to Pickup';
       return 'Order Details';
     }
 
     Color getStatusColor() {
       if (isDelivered) return Colors.green;
-      if (isPickedUp) return Colors.blue;
+      if (isDriving) return Colors.blue;
       if (isPending) return Colors.orange;
       return Colors.grey;
     }
 
     String getStatusDisplay() {
       if (isDelivered) return 'DELIVERED';
-      if (isPickedUp) return 'IN PROGRESS';
+      if (isDriving) return 'IN PROGRESS';
       if (isPending) return 'PENDING';
       return status.toUpperCase();
     }
@@ -516,13 +645,11 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(title,
-                  style:
-                      TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
               Text(subtitle,
                   style: const TextStyle(fontWeight: FontWeight.w600)),
               Text(address,
-                  style:
-                      TextStyle(fontSize: 14, color: Colors.grey.shade700)),
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade700)),
             ],
           ),
         ),
@@ -530,34 +657,11 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     );
   }
 
-  Widget _buildOrderItem(dynamic item) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Text(
-              '${item['quantity'] ?? 0}x ${item['name'] ?? 'Item'}',
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
-          Text(
-            Formatters.currencyFormat(
-                (item['price'] ?? 0) * (item['quantity'] ?? 0)),
-            style:
-                const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildActionButtons() {
-    final status = order.status?.toLowerCase() ?? 'pending';
-    final isPickedUp = status == 'picked_up' || status == 'in_transit' || status == 'driving';
-    final isPending = status == 'pending' || status == 'accepted' || status == 'confirmed' || status == 'ready';
+    final status = _getStatus();
     final isDelivered = status == 'delivered' || status == 'completed';
+    final isDriving = status == 'driving' || status == 'picked_up';
+    final isPending = status == 'pending' || status == 'accepted' || status == 'confirmed' || status == 'ready';
 
     if (isDelivered) {
       return Container(
@@ -582,29 +686,14 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
 
     return Row(
       children: [
-        if (isPickedUp)
+        if (isDriving || isPending)
           Expanded(
             child: ElevatedButton.icon(
-              onPressed: _showCompleteDialog,
+              onPressed: () => _showActionDialog(),
               icon: const Icon(Icons.check_circle),
-              label: const Text('Complete Delivery'),
+              label: Text(isDriving ? 'Complete Delivery' : 'Pick Up Order'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-          )
-        else if (isPending)
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: _showPickupDialog,
-              icon: const Icon(Icons.shopping_bag),
-              label: const Text('Pick Up Order'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0A1A2B),
+                backgroundColor: isDriving ? Colors.green : const Color(0xFF0A1A2B),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
@@ -615,8 +704,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
         const SizedBox(width: 8),
         Expanded(
           child: OutlinedButton.icon(
-            onPressed: () =>
-                _openGoogleMaps(order.deliveryAddress ?? ''),
+            onPressed: () => _openGoogleMaps(_getDeliveryAddress()),
             icon: const Icon(Icons.navigation),
             label: const Text('Navigate'),
             style: OutlinedButton.styleFrom(
@@ -632,18 +720,23 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     );
   }
 
-  // ✅ FIXED: _showPickupDialog with ScaffoldMessenger saved before async
-  void _showPickupDialog() {
+  void _showActionDialog() {
+    final status = _getStatus();
+    final isDriving = status == 'driving' || status == 'picked_up';
+    final orderId = _getOrderValue('id');
+    
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: const Text('Confirm Pickup'),
+          title: Text(isDriving ? 'Complete Delivery' : 'Confirm Pickup'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Ready to pick up this order from the seller?'),
+              Text(isDriving 
+                ? 'Confirm delivery to the customer?' 
+                : 'Ready to pick up this order from the seller?'),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -652,7 +745,9 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  '📍 ${order.sellerName ?? 'Store'}',
+                  isDriving 
+                    ? '📍 ${_getDeliveryAddress()}'
+                    : '📍 ${_getSellerName()}',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
@@ -665,112 +760,34 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
-                // Close dialog
                 Navigator.pop(dialogContext);
                 
-                // Get provider
-                final driverProvider =
-                    Provider.of<DriverProvider>(context, listen: false);
+                final driverProvider = Provider.of<DriverProvider>(context, listen: false);
+                final action = isDriving ? 'deliver' : 'pick_up';
                 
-                // ✅ Save ScaffoldMessenger before async
                 final messenger = ScaffoldMessenger.of(context);
-                
-                // Perform async operation
                 final success = await driverProvider.updateDeliveryStatus(
-                  order.id.toString(),
-                  'pick_up'
+                  orderId.toString(),
+                  action
                 );
                 
-                // Use saved messenger for SnackBar
                 messenger.showSnackBar(
                   SnackBar(
-                    content: Text(success ? '✅ Order picked up successfully' : '❌ ${driverProvider.error ?? 'Failed'}'),
+                    content: Text(success ? '✅ Action completed successfully' : '❌ ${driverProvider.error ?? 'Failed'}'),
                     backgroundColor: success ? Colors.green : Colors.red,
                   ),
                 );
                 
                 if (success && mounted) {
-                  setState(() {});
+                  // Refresh the page
+                  _loadOrderData();
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0A1A2B),
+                backgroundColor: isDriving ? Colors.green : const Color(0xFF0A1A2B),
                 foregroundColor: Colors.white,
               ),
-              child: const Text('Pick Up'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // ✅ FIXED: _showCompleteDialog with ScaffoldMessenger saved before async
-  void _showCompleteDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Complete Delivery'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Confirm delivery to the customer?'),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '📍 ${order.deliveryAddress ?? 'Delivery address'}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                // Close dialog
-                Navigator.pop(dialogContext);
-                
-                // Get provider
-                final driverProvider =
-                    Provider.of<DriverProvider>(context, listen: false);
-                
-                // ✅ Save ScaffoldMessenger before async
-                final messenger = ScaffoldMessenger.of(context);
-                
-                // Perform async operation
-                final success = await driverProvider.updateDeliveryStatus(
-                  order.id.toString(),
-                  'deliver'
-                );
-                
-                // Use saved messenger for SnackBar
-                messenger.showSnackBar(
-                  SnackBar(
-                    content: Text(success ? '✅ Delivery completed successfully 🎉' : '❌ ${driverProvider.error ?? 'Failed'}'),
-                    backgroundColor: success ? Colors.green : Colors.red,
-                  ),
-                );
-                
-                if (success && mounted) {
-                  setState(() {});
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Complete'),
+              child: Text(isDriving ? 'Complete' : 'Pick Up'),
             ),
           ],
         );

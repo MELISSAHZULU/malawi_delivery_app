@@ -1,5 +1,3 @@
-// lib/routes/app_navigator.dart
-
 import 'package:flutter/material.dart';
 import 'app_routes.dart';
 import '../screens/auth/splash_screen.dart';
@@ -28,7 +26,6 @@ import '../screens/shared/help_support_screen.dart';
 import '../screens/shared/saved_addresses_screen.dart';
 import '../screens/shared/payment_methods_screen.dart';
 import '../screens/shared/profile_screen.dart';
-
 
 class AppNavigator {
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -90,13 +87,13 @@ class AppNavigator {
       
       case AppRoutes.editShopProfile:
         return MaterialPageRoute(builder: (_) => const EditShopProfileScreen());
-        
+      
       case AppRoutes.manageProducts:
         return MaterialPageRoute(builder: (_) => const ManageProductsScreen());
-
+      
       case AppRoutes.storeSettings:
         return MaterialPageRoute(builder: (_) => const StoreSettingsScreen());
-
+      
       case AppRoutes.salesAnalytics:
         return MaterialPageRoute(builder: (_) => const SalesAnalyticsScreen());
 
@@ -111,7 +108,12 @@ class AppNavigator {
         return MaterialPageRoute(builder: (_) => const DriverDeliveriesScreen());
       
       case AppRoutes.deliveryDetail:
-        return MaterialPageRoute(builder: (_) => const DeliveryDetailScreen());
+        // ✅ FIXED: Extract arguments and pass to constructor
+        final args = settings.arguments;
+        return MaterialPageRoute(
+          builder: (_) => DeliveryDetailScreen(order: args),
+          settings: settings,
+        );
       
       case AppRoutes.driverTracking:
         final orderId = settings.arguments as String? ?? '';

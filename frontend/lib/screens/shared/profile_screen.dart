@@ -17,9 +17,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
   int _orderCount = 0;
   int _productCount = 0;
-  double _rating = 0;
+  double _rating = 0.0;
   int _totalDeliveries = 0;
-  double _totalEarnings = 0;
+  double _totalEarnings = 0.0;
 
   @override
   void initState() {
@@ -39,6 +39,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // Fetch orders
       await orderProvider.fetchOrders();
       final orders = orderProvider.orders;
+      
+      // Reset values
+      _orderCount = 0;
+      _productCount = 0;
+      _rating = 0.0;
+      _totalDeliveries = 0;
+      _totalEarnings = 0.0;
 
       // Fetch products (if seller)
       if (user?.isSeller == true) {
@@ -56,7 +63,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               .where((o) => o.status == 'delivered' || o.status == 'completed')
               .fold(0.0, (sum, order) => sum + (order.total ?? 0));
           if (_orderCount > 0) {
-            _rating = 4.5; // This would come from backend
+            _rating = 4.5;
           }
         } else if (user.isDriver) {
           _totalDeliveries = orders
@@ -66,7 +73,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               .where((o) => o.status == 'delivered' || o.status == 'completed')
               .fold(0.0, (sum, order) => sum + (order.deliveryFee ?? 0));
           if (_totalDeliveries > 0) {
-            _rating = 4.8; // This would come from backend
+            _rating = 4.8;
           }
         }
       }
@@ -364,7 +371,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _buildStatCard('Earnings', 'MWK ${_totalEarnings.toStringAsFixed(0)}', Icons.attach_money),
         ],
       );
-    } else if (user.isBuyer) {
+    } else {
+      // Buyer (default)
       return Row(
         children: [
           _buildStatCard('Orders', '$_orderCount', Icons.shopping_bag),
@@ -373,7 +381,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       );
     }
-    return const SizedBox.shrink();
   }
 
   Widget _buildStatCard(String label, String value, IconData icon) {
