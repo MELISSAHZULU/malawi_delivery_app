@@ -1,3 +1,5 @@
+// lib/routes/app_routes.dart
+
 class AppRoutes {
   static const String splash = '/';
   static const String login = '/login';
@@ -24,6 +26,11 @@ class AppRoutes {
   static const String addProduct = '/add-product';
   static const String editProduct = '/edit-product';
   static const String editShopProfile = '/edit-shop-profile';
+  
+  // NEW ROUTES
+  static const String manageProducts = '/manage-products';
+  static const String storeSettings = '/store-settings';
+  static const String salesAnalytics = '/sales-analytics';
   
   static const String savedAddresses = '/saved-addresses';
   static const String paymentMethods = '/payment-methods';

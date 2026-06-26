@@ -95,8 +95,8 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_bag_outlined),
-            label: 'Orders',
+            icon: Icon(Icons.track_changes),
+            label: 'Track',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
@@ -105,10 +105,20 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
         onTap: (index) {
           setState(() => _currentIndex = index);
-          if (index == 1) {
-            Navigator.pushNamed(context, AppRoutes.orderHistory);
+          if (index == 0) {
+            Navigator.popUntil(context, (route) => route.settings.name == AppRoutes.buyerHome);
+          } else if (index == 1) {
+            // Navigate to tracking screen with empty orderId (will show latest order)
+            Navigator.pushReplacementNamed(
+              context,
+              AppRoutes.tracking,
+              arguments: '',
+            );
           } else if (index == 2) {
-            Navigator.pushNamed(context, AppRoutes.profile);
+            Navigator.pushReplacementNamed(
+              context,
+              AppRoutes.profile,
+            );
           }
         },
       ),
