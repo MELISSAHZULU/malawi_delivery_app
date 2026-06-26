@@ -2,9 +2,9 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/driver_provider.dart';
+import '../../models/order.dart';
 import '../../utils/formatters.dart';
 import '../../routes/app_routes.dart';
-import '../../models/order.dart';
 
 class DriverDeliveriesScreen extends StatefulWidget {
   const DriverDeliveriesScreen({Key? key}) : super(key: key);
@@ -51,7 +51,14 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            Navigator.pushReplacementNamed(context, AppRoutes.driverHome);
+            // Go back to the previous screen (driver dashboard)
+            // Use pop instead of pushReplacementNamed
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              // If can't pop, navigate to driver home
+              Navigator.pushReplacementNamed(context, AppRoutes.driverHome);
+            }
           },
         ),
         title: const Text('My Deliveries'),
@@ -87,7 +94,11 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                       const SizedBox(height: 24),
                       ElevatedButton.icon(
                         onPressed: () {
-                          Navigator.pushReplacementNamed(context, AppRoutes.driverHome);
+                          if (Navigator.canPop(context)) {
+                            Navigator.pop(context);
+                          } else {
+                            Navigator.pushReplacementNamed(context, AppRoutes.driverHome);
+                          }
                         },
                         icon: const Icon(Icons.arrow_back),
                         label: const Text('Go to Dashboard'),
@@ -365,7 +376,6 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Row(
               children: [
-                // Show "Complete Delivery" for driving orders
                 if (isDriving)
                   Expanded(
                     child: ElevatedButton.icon(
@@ -380,7 +390,6 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                       ),
                     ),
                   )
-                // Show "Pick Up Order" for picked up or pending orders
                 else if (isPickedUp || isPending)
                   Expanded(
                     child: ElevatedButton.icon(
@@ -395,7 +404,6 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                       ),
                     ),
                   )
-                // Show "Completed" for delivered orders
                 else if (isDelivered)
                   Expanded(
                     child: Container(
@@ -417,12 +425,9 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                   ),
                 const SizedBox(width: 8),
                 
-                // Details button - ✅ FIXED: Pass order.toJson() directly
                 OutlinedButton.icon(
                   onPressed: () {
-                    // Convert order to JSON map and pass directly (not wrapped)
                     final orderData = order.toJson();
-                    print('📤 Navigating to delivery detail with order: ${orderData['order_number']}');
                     Navigator.pushNamed(
                       context,
                       AppRoutes.deliveryDetail,

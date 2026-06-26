@@ -12,6 +12,7 @@ import 'routes/app_routes.dart';
 import 'routes/app_navigator.dart';
 import 'utils/app_theme.dart';
 import 'screens/auth/splash_screen.dart';
+import 'screens/auth/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,12 +46,18 @@ class MyApp extends StatelessWidget {
           create: (_) => DriverProvider(),
         ),
       ],
-      child: MaterialApp(
-        title: 'MalaWiDash',
-        theme: AppTheme.lightTheme,
-        debugShowCheckedModeBanner: false,
-        initialRoute: AppRoutes.splash,
-        onGenerateRoute: AppNavigator.generateRoute,
+      child: Consumer<AuthProvider>(
+        builder: (context, authProvider, _) {
+          return MaterialApp(
+            title: 'MalaWiDash',
+            theme: AppTheme.lightTheme,
+            debugShowCheckedModeBanner: false,
+            initialRoute: AppRoutes.splash,
+            onGenerateRoute: AppNavigator.generateRoute,
+            // Always use splash as home, let it handle navigation
+            home: const SplashScreen(),
+          );
+        },
       ),
     );
   }

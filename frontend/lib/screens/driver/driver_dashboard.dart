@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/driver_provider.dart';
+import '../../models/order.dart';
 import '../../models/user.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/formatters.dart';
 import 'driver_deliveries_screen.dart';
+import 'driver_profile_screen.dart';
 
 class DriverDashboard extends StatefulWidget {
   const DriverDashboard({Key? key}) : super(key: key);
@@ -17,42 +19,48 @@ class DriverDashboard extends StatefulWidget {
 class _DriverDashboardState extends State<DriverDashboard> {
   int _currentIndex = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    // ✅ FIXED: Use addPostFrameCallback to avoid setState during build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadData();
-    });
-  }
-
-  Future<void> _loadData() async {
-    final driverProvider = Provider.of<DriverProvider>(context, listen: false);
-    await Future.wait([
-      driverProvider.fetchAssignedOrders(),
-      driverProvider.fetchAvailableOrders(),
-    ]);
-  }
+  final List<Widget> _tabs = [
+    const DashboardTab(),
+    const DriverDeliveriesScreen(),
+    const DriverProfileScreen(),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-    final driverProvider = Provider.of<DriverProvider>(context);
-    final user = authProvider.user;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(user, driverProvider.assignedOrders.length),
-            Expanded(
-              child: _currentIndex == 0
-                  ? _buildDashboardContent(driverProvider)
-                  : const DriverDeliveriesScreen(),
-            ),
-          ],
+      appBar: AppBar(
+        title: const Text(
+          'Driver Dashboard',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0A1A2B),
+          ),
         ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: Colors.black,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: () {
+              Navigator.pushNamed(context, AppRoutes.notifications);
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              // Refresh all data
+              final driverProvider = Provider.of<DriverProvider>(context, listen: false);
+              driverProvider.fetchAssignedOrders();
+            },
+          ),
+        ],
+      ),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _tabs,
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
@@ -77,94 +85,45 @@ class _DriverDashboardState extends State<DriverDashboard> {
           setState(() {
             _currentIndex = index;
           });
-          if (index == 2) {
-            Navigator.pushNamed(context, AppRoutes.profile);
-          }
         },
       ),
     );
   }
+}
 
-  Widget _buildHeader(User? user, int activeCount) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.05),
-            blurRadius: 10,
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: Colors.grey.shade200,
-            child: Text(
-              user?.username?.substring(0, 1).toUpperCase() ?? 'D',
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0A1A2B),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Hey, ${user?.username ?? 'Driver'} 😍',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0A1A2B),
-                  ),
-                ),
-                Text(
-                  activeCount > 0 
-                      ? '$activeCount active deliveries' 
-                      : 'Ready for new deliveries',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: activeCount > 0 ? Colors.green.shade600 : Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () => Navigator.pushNamed(context, AppRoutes.notifications),
-          ),
-        ],
-      ),
-    );
+class DashboardTab extends StatefulWidget {
+  const DashboardTab({Key? key}) : super(key: key);
+
+  @override
+  State<DashboardTab> createState() => _DashboardTabState();
+}
+
+class _DashboardTabState extends State<DashboardTab> {
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
   }
 
-  Widget _buildDashboardContent(DriverProvider driverProvider) {
-    final assignedOrders = driverProvider.assignedOrders;
-    final availableOrders = driverProvider.availableOrders;
-    final totalDeliveries = assignedOrders.length;
-    final deliveredCount = assignedOrders.where((o) => 
-      o.status == 'delivered' || o.status == 'completed'
-    ).length;
-    
-    // ✅ FIXED: Active count includes pending, confirmed, ready, driving, picked_up
-    final activeCount = assignedOrders.where((o) => 
-      o.status == 'driving' || 
-      o.status == 'picked_up' ||
-      o.status == 'pending' ||
-      o.status == 'confirmed' ||
-      o.status == 'ready'
-    ).length;
+  Future<void> _loadData() async {
+    final driverProvider = Provider.of<DriverProvider>(context, listen: false);
+    await driverProvider.fetchAssignedOrders();
+  }
 
+  @override
+  Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final driverProvider = Provider.of<DriverProvider>(context);
+    final user = authProvider.user;
+
+    final assignedOrders = driverProvider.assignedOrders;
+    final totalDeliveries = assignedOrders.length;
+    final completedDeliveries = assignedOrders.where((o) => o.isDelivered).length;
+    final activeDeliveries = assignedOrders.where((o) => o.isActive && !o.isDelivered).length;
+    
     final totalEarnings = assignedOrders
-        .where((o) => o.status == 'delivered' || o.status == 'completed')
-        .fold(0.0, (sum, o) => sum + (o.deliveryFee ?? 0));
+        .where((o) => o.isDelivered)
+        .fold(0.0, (sum, o) => sum + o.deliveryFee);
 
     return RefreshIndicator(
       onRefresh: _loadData,
@@ -173,27 +132,73 @@ class _DriverDashboardState extends State<DriverDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Welcome Header
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.05),
+                    blurRadius: 10,
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: Colors.grey.shade200,
+                    child: Text(
+                      user?.username?.substring(0, 1).toUpperCase() ?? 'D',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0A1A2B),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Hey, ${user?.username ?? 'Driver'} 👋',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0A1A2B),
+                          ),
+                        ),
+                        Text(
+                          activeDeliveries > 0 
+                              ? '$activeDeliveries active deliveries' 
+                              : 'Ready for new deliveries',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: activeDeliveries > 0 ? Colors.green.shade600 : Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    onPressed: _loadData,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
             // Stats Row
             Row(
               children: [
-                _buildStatCard(
-                  '$totalDeliveries', 
-                  'Total', 
-                  Icons.delivery_dining, 
-                  Colors.blue,
-                ),
-                _buildStatCard(
-                  '${totalDeliveries > 0 ? (deliveredCount / totalDeliveries * 100).toStringAsFixed(0) : 0}%', 
-                  'Completion', 
-                  Icons.percent, 
-                  Colors.green,
-                ),
-                _buildStatCard(
-                  activeCount > 0 ? '$activeCount' : '0', 
-                  'Active', 
-                  Icons.circle, 
-                  activeCount > 0 ? Colors.green : Colors.grey,
-                ),
+                _buildStatCard('$totalDeliveries', 'Total', Icons.delivery_dining, Colors.blue),
+                _buildStatCard('${totalDeliveries > 0 ? (completedDeliveries / totalDeliveries * 100).toStringAsFixed(0) : 0}%', 'Completion', Icons.percent, Colors.green),
+                _buildStatCard('$activeDeliveries', 'Active', Icons.circle, activeDeliveries > 0 ? Colors.green : Colors.grey),
               ],
             ),
             const SizedBox(height: 16),
@@ -226,7 +231,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                       Text(
                         Formatters.currencyFormat(totalEarnings),
                         style: const TextStyle(
-                          fontSize: 32,
+                          fontSize: 28,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
@@ -238,7 +243,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          deliveredCount > 0 ? '${deliveredCount} completed' : 'No deliveries',
+                          completedDeliveries > 0 ? '$completedDeliveries completed' : 'No deliveries',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
@@ -248,21 +253,13 @@ class _DriverDashboardState extends State<DriverDashboard> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildStatItem('$deliveredCount Delivered', Icons.check_circle),
-                      _buildStatItem('${assignedOrders.length - deliveredCount} Pending', Icons.pending),
-                    ],
-                  ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
 
-            // Available Orders - Show orders ready for pickup
-            if (availableOrders.isNotEmpty) ...[
+            // Recent Deliveries
+            if (assignedOrders.isNotEmpty)
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -271,99 +268,25 @@ class _DriverDashboardState extends State<DriverDashboard> {
                   boxShadow: [
                     BoxShadow(
                       color: Colors.grey.withOpacity(0.05),
-                      blurRadius: 5,
+                      blurRadius: 10,
                     ),
                   ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.notifications_active, color: Colors.orange),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Available Orders',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.orange,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            '${availableOrders.length}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    ...availableOrders.take(3).map((order) => _buildAvailableOrderCard(order)),
-                    if (availableOrders.length > 3)
-                      TextButton(
-                        onPressed: () {
-                          // Navigate to available orders list
-                        },
-                        child: const Text('View all available orders →'),
+                    const Text(
+                      'Recent Deliveries',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    ...assignedOrders.take(3).map((order) => _buildRecentDelivery(order)),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-            ],
-
-            // Assigned Deliveries
-            if (assignedOrders.isNotEmpty) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.05),
-                      blurRadius: 5,
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'My Deliveries',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _currentIndex = 1;
-                            });
-                          },
-                          child: const Text('View all'),
-                        ),
-                      ],
-                    ),
-                    ...assignedOrders.take(3).map((order) => _buildDeliveryCard(order)),
-                  ],
-                ),
-              ),
-            ],
           ],
         ),
       ),
@@ -410,132 +333,15 @@ class _DriverDashboardState extends State<DriverDashboard> {
     );
   }
 
-  Widget _buildStatItem(String label, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, color: Colors.white70, size: 16),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.white70,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAvailableOrderCard(dynamic order) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.orange.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.orange.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                order.orderNumber ?? 'Order',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.orange,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  'READY',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Pickup: ${order.sellerName ?? 'Store'}',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Total: ${Formatters.currencyFormat(order.total ?? 0)}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  final driverProvider = Provider.of<DriverProvider>(context, listen: false);
-                  final success = await driverProvider.acceptDelivery(int.parse(order.id));
-                  if (success) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('✅ Delivery accepted!'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                    await _loadData();
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('❌ ${driverProvider.error ?? 'Failed to accept'}'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                ),
-                child: const Text(
-                  'Accept',
-                  style: TextStyle(fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ✅ FIXED: _buildDeliveryCard with deliveryFee instead of total
-  Widget _buildDeliveryCard(dynamic order) {
-    final status = order.status ?? 'pending';
+  Widget _buildRecentDelivery(Order order) {
+    final status = order.status;
     final isDelivered = status == 'delivered' || status == 'completed';
     final isActive = status == 'driving' || status == 'picked_up';
-    
+
     Color getStatusColor() {
       if (isDelivered) return Colors.green;
       if (isActive) return Colors.blue;
       return Colors.orange;
-    }
-
-    String getStatusText() {
-      if (isDelivered) return 'Completed';
-      if (isActive) return 'In Progress';
-      return 'Pending';
     }
 
     return Container(
@@ -561,25 +367,24 @@ class _DriverDashboardState extends State<DriverDashboard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  order.orderNumber ?? 'Order',
+                  order.orderNumber,
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
                 ),
                 Text(
-                  getStatusText(),
+                  order.deliveryAddress ?? 'No address',
                   style: TextStyle(
                     fontSize: 12,
-                    color: getStatusColor(),
+                    color: Colors.grey.shade600,
                   ),
                 ),
               ],
             ),
           ),
-          // ✅ FIXED: Show deliveryFee instead of total
           Text(
-            Formatters.currencyFormat(order.deliveryFee ?? 0),
+            Formatters.currencyFormat(order.deliveryFee),
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 14,

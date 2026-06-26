@@ -21,62 +21,65 @@ class DriverProvider extends ChangeNotifier {
 
     try {
       final response = await _apiService.getDriverOrders();
-      print('Fetch driver orders response: $response');
+      print('📦 Fetch driver orders raw response: $response');
       
       if (response['success'] == true) {
         final data = response['data'];
+        print('📦 Data type: ${data.runtimeType}');
+        
         if (data is List) {
-          _assignedOrders = data.map((item) {
+          print('📦 Data is a list with ${data.length} items');
+          
+          _assignedOrders = [];
+          for (var item in data) {
             try {
-              final orderDetails = item['order_details'] as Map<String, dynamic>?;
-              if (orderDetails == null) return null;
+              print('📦 Processing item with keys: ${item.keys}');
               
-              // Add assignment data to order details
-              orderDetails['assignment_id'] = item['id'].toString();
+              Map<String, dynamic> orderData = {};
+              
+              item.forEach((key, value) {
+                orderData[key] = value;
+              });
+              
+              orderData['order_number'] = item['order_number'];
+              orderData['status'] = item['status'];
+              orderData['total'] = item['total_amount'];
+              orderData['delivery_fee'] = item['delivery_fee'];
+              orderData['items'] = item['items'] ?? [];
+              orderData['driver_name'] = item['driver_name'];
+              orderData['driver_phone'] = item['driver_phone'];
+              orderData['seller_name'] = item['seller_name'];
+              orderData['seller_address'] = item['seller_address'];
+              orderData['delivery_address'] = item['delivery_address'];
+              orderData['delivery_instructions'] = item['delivery_instructions'] ?? '';
+              orderData['customer_name'] = 'Customer';
+              orderData['customer_phone'] = item['customer_phone'] ?? '';
+              orderData['assignment_id'] = item['id']?.toString();
+              
               if (item['status'] != null) {
-                orderDetails['assignment_status'] = item['status'].toString();
-              }
-              if (item['driver_name'] != null) {
-                orderDetails['driver_name'] = item['driver_name'].toString();
-              }
-              if (item['driver_phone'] != null) {
-                orderDetails['driver_phone'] = item['driver_phone'].toString();
-              }
-              if (item['seller_name'] != null) {
-                orderDetails['seller_name'] = item['seller_name'].toString();
-              }
-              if (item['delivery_address'] != null) {
-                orderDetails['delivery_address'] = item['delivery_address'].toString();
-              }
-              if (item['customer_name'] != null) {
-                orderDetails['customer_name'] = item['customer_name'].toString();
-              }
-              if (item['customer_phone'] != null) {
-                orderDetails['customer_phone'] = item['customer_phone'].toString();
+                orderData['assignment_status'] = item['status'].toString();
               }
               
-              print('✅ Parsing order: ${orderDetails['order_number']}');
-              print('✅ Status: ${orderDetails['status']}');
-              print('✅ Seller: ${orderDetails['seller_name']}');
-              print('✅ Customer: ${orderDetails['customer_name']}');
+              print('📦 Created order data: ${orderData['order_number']}, Status: ${orderData['status']}');
               
-              return Order.fromJson(orderDetails);
+              _assignedOrders.add(Order.fromJson(orderData));
             } catch (e) {
-              print('Error parsing order: $e');
-              return null;
+              print('❌ Error parsing order: $e');
             }
-          }).whereType<Order>().toList();
-          print('Driver orders loaded: ${_assignedOrders.length}');
+          }
+          
+          print('✅ Driver orders loaded: ${_assignedOrders.length}');
         } else {
+          print('⚠️ Data is not a list: ${data.runtimeType}');
           _assignedOrders = [];
         }
       } else {
         _error = response['error'] ?? 'Failed to fetch driver orders';
-        print('Error loading driver orders: $_error');
+        print('❌ Error loading driver orders: $_error');
       }
     } catch (e) {
       _error = 'Network error: $e';
-      print('Network error: $e');
+      print('❌ Network error: $e');
     }
 
     _isLoading = false;
@@ -89,40 +92,34 @@ class DriverProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final dynamic response = await _apiService.getAvailableOrders();
-      print('Fetch available orders response: $response');
+      final response = await _apiService.getAvailableOrders();
+      print('📦 Fetch available orders raw response: $response');
       
-      List<dynamic> ordersList = [];
+      _availableOrders = [];
       
-      if (response is List) {
-        ordersList = response;
-        print('✅ Available orders: plain list with ${ordersList.length} items');
-      } else if (response is Map<String, dynamic>) {
-        if (response['success'] == true) {
-          final data = response['data'];
-          if (data is List) {
-            ordersList = data;
-            print('✅ Available orders: wrapped list with ${ordersList.length} items');
+      // getAvailableOrders always returns Map<String, dynamic>
+      if (response['success'] == true) {
+        final data = response['data'];
+        if (data is List) {
+          for (var item in data) {
+            try {
+              final order = Order.fromJson(item as Map<String, dynamic>);
+              _availableOrders.add(order);
+            } catch (e) {
+              print('❌ Error parsing available order: $e');
+            }
           }
+          print('✅ Available orders loaded: ${_availableOrders.length}');
         } else {
-          _error = response['error'] ?? 'Failed to fetch available orders';
+          print('⚠️ Data is not a list: ${data.runtimeType}');
         }
+      } else {
+        _error = response['error'] ?? 'Failed to fetch available orders';
+        print('❌ Error loading available orders: $_error');
       }
-      
-      _availableOrders = ordersList.map((item) {
-        try {
-          return Order.fromJson(item as Map<String, dynamic>);
-        } catch (e) {
-          print('Error parsing available order: $e');
-          return null;
-        }
-      }).whereType<Order>().toList();
-      
-      print('Available orders parsed: ${_availableOrders.length}');
-      
     } catch (e) {
       _error = 'Network error: $e';
-      print('Network error fetching available orders: $e');
+      print('❌ Network error fetching available orders: $e');
     }
 
     _isLoading = false;
@@ -136,25 +133,22 @@ class DriverProvider extends ChangeNotifier {
 
     try {
       final response = await _apiService.acceptDelivery(orderId);
-      print('Accept delivery response: $response');
+      print('📦 Accept delivery response: $response');
       
       if (response['success'] == true) {
         await fetchAssignedOrders();
         await fetchAvailableOrders();
-        _isLoading = false;
-        notifyListeners();
         return true;
       } else {
         _error = response['error'] ?? 'Failed to accept delivery';
-        _isLoading = false;
-        notifyListeners();
         return false;
       }
     } catch (e) {
       _error = 'Network error: $e';
+      return false;
+    } finally {
       _isLoading = false;
       notifyListeners();
-      return false;
     }
   }
 
@@ -165,25 +159,22 @@ class DriverProvider extends ChangeNotifier {
 
     try {
       final response = await _apiService.updateDeliveryStatus(orderId, action);
-      print('Update delivery status response: $response');
+      print('📦 Update delivery status response: $response');
       
       if (response['success'] == true) {
         await fetchAssignedOrders();
         await fetchAvailableOrders();
-        _isLoading = false;
-        notifyListeners();
         return true;
       } else {
         _error = response['error'] ?? 'Failed to update delivery status';
-        _isLoading = false;
-        notifyListeners();
         return false;
       }
     } catch (e) {
       _error = 'Network error: $e';
+      return false;
+    } finally {
       _isLoading = false;
       notifyListeners();
-      return false;
     }
   }
 
@@ -192,22 +183,11 @@ class DriverProvider extends ChangeNotifier {
       print('🔍 Looking for order with ID: $id');
       print('📋 Available orders: ${_assignedOrders.length}');
       
-      var results = _assignedOrders.where((order) => order.id.toString() == id);
-      if (results.isNotEmpty) {
-        print('✅ Found order by ID: ${results.first.orderNumber}');
-        return results.first;
-      }
-      
-      results = _assignedOrders.where((order) => order.orderNumber == id);
-      if (results.isNotEmpty) {
-        print('✅ Found order by order number: ${results.first.orderNumber}');
-        return results.first;
-      }
-      
-      results = _assignedOrders.where((order) => order.assignmentId == id);
-      if (results.isNotEmpty) {
-        print('✅ Found order by assignment ID: ${results.first.orderNumber}');
-        return results.first;
+      for (var order in _assignedOrders) {
+        if (order.id.toString() == id || order.orderNumber == id || order.assignmentId == id) {
+          print('✅ Found order: ${order.orderNumber}');
+          return order;
+        }
       }
       
       print('❌ Order not found with ID: $id');
@@ -216,32 +196,6 @@ class DriverProvider extends ChangeNotifier {
       print('❌ Error finding order: $e');
       return null;
     }
-  }
-
-  String getOrderStatus(String id) {
-    final order = getOrderById(id);
-    return order?.status ?? 'unknown';
-  }
-
-  bool isOrderPending(String id) {
-    final order = getOrderById(id);
-    if (order == null) return false;
-    final status = order.status.toLowerCase();
-    return status == 'pending' || status == 'accepted' || status == 'confirmed' || status == 'ready';
-  }
-
-  bool isOrderPickedUp(String id) {
-    final order = getOrderById(id);
-    if (order == null) return false;
-    final status = order.status.toLowerCase();
-    return status == 'picked_up' || status == 'in_transit' || status == 'driving';
-  }
-
-  bool isOrderDelivered(String id) {
-    final order = getOrderById(id);
-    if (order == null) return false;
-    final status = order.status.toLowerCase();
-    return status == 'delivered' || status == 'completed';
   }
 
   void clearError() {

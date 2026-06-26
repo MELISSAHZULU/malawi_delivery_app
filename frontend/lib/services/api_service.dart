@@ -109,6 +109,80 @@ class ApiService {
     }
   }
 
+  Future<void> logout() async {
+    await _storage.deleteAll();
+  }
+
+  Future<Map<String, dynamic>> getCurrentUser() async {
+    try {
+      final token = await _storage.read(key: 'access_token');
+      
+      if (token == null) {
+        return {'success': false, 'error': 'No token found'};
+      }
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/auth/profile/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('Get user status: ${response.statusCode}');
+      print('Get user body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return {'success': true, 'data': data};
+      } else if (response.statusCode == 401) {
+        return {'success': false, 'error': 'Session expired'};
+      } else {
+        return {'success': false, 'error': 'Failed to get user'};
+      }
+    } catch (e) {
+      print('Get user error: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateStore(Map<String, dynamic> storeData) async {
+    try {
+      final token = await _storage.read(key: 'access_token');
+      
+      if (token == null) {
+        return {'success': false, 'error': 'Not authenticated'};
+      }
+      
+      final response = await http.put(
+        Uri.parse('$baseUrl/auth/update-store/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode(storeData),
+      );
+
+      print('Update store status: ${response.statusCode}');
+      print('Update store body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return {
+          'success': true, 
+          'data': data,
+          'user': data['user'] ?? null
+        };
+      }
+      return {'success': false, 'error': 'Failed to update store'};
+    } catch (e) {
+      print('Update store error: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
   // ============ PRODUCTS ============
   Future<Map<String, dynamic>> getProducts() async {
     try {
@@ -419,72 +493,6 @@ class ApiService {
     }
   }
 
-  // ============ USER ============
-  Future<Map<String, dynamic>> getCurrentUser() async {
-    try {
-      final token = await _storage.read(key: 'access_token');
-      
-      if (token == null) {
-        return {'success': false, 'error': 'No token found'};
-      }
-      
-      final response = await http.get(
-        Uri.parse('$baseUrl/auth/profile/'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      print('Get user status: ${response.statusCode}');
-      print('Get user body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return {'success': true, 'data': data};
-      } else if (response.statusCode == 401) {
-        return {'success': false, 'error': 'Session expired'};
-      } else {
-        return {'success': false, 'error': 'Failed to get user'};
-      }
-    } catch (e) {
-      print('Get user error: $e');
-      return {'success': false, 'error': e.toString()};
-    }
-  }
-
-  Future<Map<String, dynamic>> updateStore(Map<String, dynamic> storeData) async {
-    try {
-      final token = await _storage.read(key: 'access_token');
-      
-      if (token == null) {
-        return {'success': false, 'error': 'Not authenticated'};
-      }
-      
-      final response = await http.put(
-        Uri.parse('$baseUrl/auth/update-store/'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: json.encode(storeData),
-      );
-
-      print('Update store status: ${response.statusCode}');
-      print('Update store body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'data': json.decode(response.body)};
-      }
-      return {'success': false, 'error': 'Failed to update store'};
-    } catch (e) {
-      print('Update store error: $e');
-      return {'success': false, 'error': e.toString()};
-    }
-  }
-
   // ============ NOTIFICATIONS ============
   Future<Map<String, dynamic>> getNotifications() async {
     try {
@@ -507,7 +515,8 @@ class ApiService {
       print('Get notifications body: ${response.body}');
 
       if (response.statusCode == 200) {
-        return {'success': true, 'data': json.decode(response.body)};
+        final data = json.decode(response.body);
+        return {'success': true, 'data': data};
       }
       return {'success': false, 'error': 'Failed to fetch notifications'};
     } catch (e) {
@@ -629,7 +638,8 @@ class ApiService {
       print('Get driver orders body: ${response.body}');
 
       if (response.statusCode == 200) {
-        return {'success': true, 'data': json.decode(response.body)};
+        final data = json.decode(response.body);
+        return {'success': true, 'data': data};
       }
       return {'success': false, 'error': 'Failed to fetch driver orders'};
     } catch (e) {
@@ -699,34 +709,46 @@ class ApiService {
     }
   }
 
-  Future<void> logout() async {
-    await _storage.deleteAll();
-  }
-
   Future<Map<String, dynamic>> getAvailableOrders() async {
-  try {
-    final token = await _storage.read(key: 'access_token');
-    if (token == null) return {'success': false, 'error': 'Not authenticated'};
+    try {
+      final token = await _storage.read(key: 'access_token');
+      if (token == null) {
+        return {'success': false, 'error': 'Not authenticated'};
+      }
 
-    final response = await http.get(
-      Uri.parse('$baseUrl/delivery/available/'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
+      final response = await http.get(
+        Uri.parse('$baseUrl/delivery/available/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
 
-    print('Get available orders status: ${response.statusCode}');
-    print('Get available orders body: ${response.body}');
+      print('Get available orders status: ${response.statusCode}');
+      print('Get available orders body: ${response.body}');
 
-    if (response.statusCode == 200) {
-      return {'success': true, 'data': json.decode(response.body)};
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        
+        // Handle both plain list and wrapped response
+        if (data is List) {
+          return {'success': true, 'data': data};
+        } else if (data is Map<String, dynamic>) {
+          // If it's already a map with success, return it
+          if (data.containsKey('success')) {
+            return data;
+          }
+          // Otherwise wrap it
+          return {'success': true, 'data': data};
+        } else {
+          return {'success': true, 'data': data};
+        }
+      }
+      return {'success': false, 'error': 'Failed to fetch available orders'};
+    } catch (e) {
+      print('Get available orders error: $e');
+      return {'success': false, 'error': e.toString()};
     }
-    return {'success': false, 'error': 'Failed to fetch available orders'};
-  } catch (e) {
-    return {'success': false, 'error': e.toString()};
   }
 }
-}
-

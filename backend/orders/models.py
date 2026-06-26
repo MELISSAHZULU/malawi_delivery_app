@@ -69,6 +69,14 @@ class Order(models.Model):
         help_text="Longitude of seller/restaurant"
     )
     
+    # ✅ ADD THIS - Seller address field
+    seller_address = models.CharField(
+        max_length=255, 
+        blank=True, 
+        null=True,
+        help_text="Address of the seller/restaurant"
+    )
+    
     payment_method = models.CharField(max_length=20, default='paychangu')
     payment_status = models.CharField(max_length=20, default='pending')
     payment_transaction_id = models.CharField(max_length=100, null=True, blank=True)
@@ -100,6 +108,7 @@ class Order(models.Model):
         self.status = status
         self.save()
         return update
+
 
 class OrderTracking(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='tracking')

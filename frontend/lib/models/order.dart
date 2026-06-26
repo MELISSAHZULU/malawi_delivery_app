@@ -2,7 +2,7 @@ import 'cart_item.dart';
 
 class Order {
   final String id;
-  final String? assignmentId; // driver assignment id
+  final String? assignmentId;
   final String orderNumber;
   final String status;
   final List<CartItem> items;
@@ -12,8 +12,8 @@ class Order {
   final String deliveryAddress;
   final String? driverName;
   final String? driverPhone;
-  final String? driverVehicle; // vehicle type
-  final double? driverRating; // driver rating
+  final String? driverVehicle;
+  final double? driverRating;
   final DateTime createdAt;
   final DateTime? estimatedDeliveryTime;
   final String? paymentStatus;
@@ -29,8 +29,8 @@ class Order {
   final double? sellerLongitude;
   final double? deliveryLatitude;
   final double? deliveryLongitude;
-  final String? deliveryInstructions; // delivery notes
-  final String? assignmentStatus; // status from assignment (overrides order status)
+  final String? deliveryInstructions;
+  final String? assignmentStatus;
 
   Order({
     required this.id,
@@ -69,7 +69,12 @@ class Order {
     List<CartItem> parseItems(dynamic itemsData) {
       if (itemsData == null) return [];
       if (itemsData is List) {
-        return itemsData.map((item) => CartItem.fromJson(item)).toList();
+        return itemsData.map((item) {
+          if (item is Map) {
+            return CartItem.fromJson(Map<String, dynamic>.from(item));
+          }
+          return CartItem.fromJson(item as Map<String, dynamic>);
+        }).toList();
       }
       return [];
     }
@@ -102,8 +107,16 @@ class Order {
       return null;
     }
 
-    // Check if we have assignment status override
     final status = json['assignment_status'] ?? json['status'] ?? 'pending';
+    
+    DateTime parseDate(dynamic value) {
+      if (value == null) return DateTime.now();
+      try {
+        return DateTime.parse(value.toString());
+      } catch (e) {
+        return DateTime.now();
+      }
+    }
 
     return Order(
       id: (json['id'] ?? '').toString(),
@@ -112,15 +125,14 @@ class Order {
       items: parseItems(json['items']),
       subtotal: parseTotal(json['subtotal']),
       deliveryFee: parseTotal(json['delivery_fee'] ?? json['deliveryFee']),
-      total: parseTotal(json['total']),
+      total: parseTotal(json['total'] ?? json['total_amount']),
       deliveryAddress: json['delivery_address'] ?? json['deliveryAddress'] ?? '',
       driverName: json['driver_name'] ?? json['driverName'] ?? json['driver_username'],
       driverPhone: json['driver_phone'] ?? json['driverPhone'] ?? json['driver_phone_number'],
       driverVehicle: parseDriverVehicle(json['driver_vehicle'] ?? json['driverVehicle'] ?? json['vehicle_type']),
       driverRating: parseNullableDouble(json['driver_rating'] ?? json['driverRating']),
       assignmentId: json['assignment_id'] ?? json['assignmentId'],
-      createdAt: DateTime.parse(
-          json['created_at'] ?? json['createdAt'] ?? DateTime.now().toIso8601String()),
+      createdAt: parseDate(json['created_at'] ?? json['createdAt']),
       estimatedDeliveryTime: json['estimated_delivery_time'] != null
           ? DateTime.parse(json['estimated_delivery_time'])
           : json['estimatedDeliveryTime'] != null
@@ -133,7 +145,7 @@ class Order {
       sellerAddress: json['seller_address'] ?? json['sellerAddress'] ?? json['store_address'],
       pickupAddress: json['pickup_address'] ?? json['pickupAddress'],
       buyerName: json['buyer_name'] ?? json['buyerName'],
-      customerName: json['customer_name'] ?? json['customerName'] ?? json['buyer_name'] ?? json['buyerName'],
+      customerName: json['customer_name'] ?? json['customerName'] ?? json['buyer_name'] ?? json['buyerName'] ?? 'Customer',
       customerPhone: json['customer_phone'] ?? json['customerPhone'] ?? json['buyer_phone'],
       sellerLatitude: parseNullableDouble(
           json['seller_latitude'] ?? json['sellerLatitude'] ?? json['store_latitude']),
@@ -143,7 +155,7 @@ class Order {
           json['delivery_latitude'] ?? json['deliveryLatitude']),
       deliveryLongitude: parseNullableDouble(
           json['delivery_longitude'] ?? json['deliveryLongitude']),
-      deliveryInstructions: json['delivery_instructions'] ?? json['deliveryInstructions'],
+      deliveryInstructions: json['delivery_instructions'] ?? json['deliveryInstructions'] ?? '',
       assignmentStatus: json['assignment_status'],
     );
   }
@@ -183,7 +195,6 @@ class Order {
     };
   }
 
-  // Copy with method
   Order copyWith({
     String? id,
     String? assignmentId,
@@ -261,10 +272,8 @@ class Order {
   bool get isDelivered => status == 'delivered' || status == 'completed';
   bool get isCancelled => status == 'cancelled';
 
-  // Get the effective status (assignment status overrides order status)
   String get effectiveStatus => assignmentStatus ?? status;
 
-  // Progress calculation
   double get progress {
     final statuses = [
       'pending', 'confirmed', 'preparing', 'ready',
@@ -276,7 +285,6 @@ class Order {
     return (index / (statuses.length - 1)) * 100;
   }
 
-  // Helper to get status display name
   String get statusDisplay {
     final currentStatus = effectiveStatus;
     switch (currentStatus) {
@@ -305,41 +313,35 @@ class Order {
     }
   }
 
-  // Helper to get status color
   String get statusColor {
     final currentStatus = effectiveStatus;
     switch (currentStatus) {
       case 'pending':
-        return '#F59E0B'; // Orange
+        return '#F59E0B';
       case 'confirmed':
-        return '#3B82F6'; // Blue
+        return '#3B82F6';
       case 'preparing':
-        return '#8B5CF6'; // Purple
+        return '#8B5CF6';
       case 'ready':
-        return '#06B6D4'; // Cyan
+        return '#06B6D4';
       case 'picked_up':
-        return '#14B8A6'; // Teal
+        return '#14B8A6';
       case 'driving':
-        return '#2A7DE1'; // Blue
+        return '#2A7DE1';
       case 'arrived':
-        return '#6366F1'; // Indigo
+        return '#6366F1';
       case 'delivered':
-        return '#22C55E'; // Green
+        return '#22C55E';
       case 'completed':
-        return '#22C55E'; // Green
+        return '#22C55E';
       case 'cancelled':
-        return '#EF4444'; // Red
+        return '#EF4444';
       default:
-        return '#6B7280'; // Gray
+        return '#6B7280';
     }
   }
 
-  // Check if driver is assigned
   bool get hasDriver => driverName != null && driverName!.isNotEmpty;
-
-  // Check if order is active (not delivered or cancelled)
   bool get isActive => !isDelivered && !isCancelled;
-
-  // Get items count
   int get itemCount => items.length;
 }

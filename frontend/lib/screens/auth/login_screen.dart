@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/validators.dart';
-import '../../utils/constants.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -17,6 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -123,34 +123,28 @@ class _LoginScreenState extends State<LoginScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: authProvider.isLoading
+                    onPressed: _isLoading || authProvider.isLoading
                         ? null
                         : () async {
                             if (_formKey.currentState!.validate()) {
+                              setState(() => _isLoading = true);
+                              authProvider.clearError();
+                              
                               final success = await authProvider.login(
-                                _usernameController.text,
-                                _passwordController.text,
+                                _usernameController.text.trim(),
+                                _passwordController.text.trim(),
                               );
+                              
+                              setState(() => _isLoading = false);
+                              
                               if (success && mounted) {
-                                // Navigate based on role
-                                final user = authProvider.user;
-                                if (user != null) {
-                                  String route;
-                                  if (user.isBuyer) {
-                                    route = AppRoutes.buyerHome;
-                                  } else if (user.isSeller) {
-                                    route = AppRoutes.sellerHome;
-                                  } else if (user.isDriver) {
-                                    route = AppRoutes.driverHome;
-                                  } else {
-                                    route = AppRoutes.buyerHome;
-                                  }
-                                  Navigator.pushReplacementNamed(context, route);
-                                }
+                                print('✅ Login successful! Redirecting...');
+                                // Navigate to splash screen which will handle role-based routing
+                                Navigator.pushReplacementNamed(context, AppRoutes.splash);
                               }
                             }
                           },
-                    child: authProvider.isLoading
+                    child: _isLoading || authProvider.isLoading
                         ? const CircularProgressIndicator(color: Colors.white)
                         : const Text('Login', style: TextStyle(fontSize: 16)),
                   ),

@@ -15,6 +15,15 @@ class AuthProvider extends ChangeNotifier {
   bool get isAuthenticated => _user != null;
   String? get token => _token;
 
+  bool get isBuyer => _user?.role == 'buyer';
+  bool get isSeller => _user?.role == 'seller';
+  bool get isDriver => _user?.role == 'driver';
+  
+  String? get sellerAddress {
+    if (_user == null || !_user!.isSeller) return null;
+    return _user?.sellerAddress ?? _user?.location;
+  }
+
   Future<bool> login(String username, String password) async {
     _isLoading = true;
     _error = null;
@@ -76,9 +85,15 @@ class AuthProvider extends ChangeNotifier {
   Future<void> loadUser() async {
     try {
       final response = await _apiService.getCurrentUser();
+      print('Load user response: $response');
       if (response['success'] == true) {
         _user = User.fromJson(response['data']);
         notifyListeners();
+        print('User loaded: ${_user?.username}, Role: ${_user?.role}');
+        if (_user?.isSeller == true) {
+          print('Seller address: ${_user?.sellerAddress}');
+          print('Store name: ${_user?.storeName}');
+        }
       }
     } catch (e) {
       print('Error loading user: $e');
@@ -96,8 +111,4 @@ class AuthProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
   }
-
-  bool get isBuyer => _user?.role == 'buyer';
-  bool get isSeller => _user?.role == 'seller';
-  bool get isDriver => _user?.role == 'driver';
 }

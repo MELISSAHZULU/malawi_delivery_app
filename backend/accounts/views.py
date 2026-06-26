@@ -1,5 +1,3 @@
-# backend/accounts/views.py
-
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -89,6 +87,7 @@ class LoginView(TokenObtainPairView):
         user_data = UserSerializer(user).data
         if user.role == 'seller' and hasattr(user, 'seller_profile'):
             user_data['store_name'] = user.seller_profile.store_name
+            user_data['seller_address'] = user.seller_profile.address
         
         print(f"Login successful for {username}, Role: {user.role}")
         
@@ -107,6 +106,19 @@ class ProfileView(generics.RetrieveUpdateAPIView):
     
     def get_object(self):
         return self.request.user
+    
+    def retrieve(self, request, *args, **kwargs):
+        user = self.get_object()
+        data = ProfileSerializer(user).data
+        
+        if user.role == 'seller' and hasattr(user, 'seller_profile'):
+            data['store_name'] = user.seller_profile.store_name
+            data['seller_address'] = user.seller_profile.address
+        
+        return Response({
+            'success': True,
+            'data': data
+        })
 
 
 class UpdateStoreView(generics.UpdateAPIView):
@@ -123,8 +135,15 @@ class UpdateStoreView(generics.UpdateAPIView):
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
         
+        user = self.request.user
+        user_data = UserSerializer(user).data
+        if hasattr(user, 'seller_profile'):
+            user_data['store_name'] = user.seller_profile.store_name
+            user_data['seller_address'] = user.seller_profile.address
+        
         return Response({
             'success': True,
             'data': serializer.data,
+            'user': user_data,
             'message': 'Store updated successfully'
         })

@@ -108,7 +108,6 @@ class AppNavigator {
         return MaterialPageRoute(builder: (_) => const DriverDeliveriesScreen());
       
       case AppRoutes.deliveryDetail:
-        // ✅ FIXED: Extract arguments and pass to constructor
         final args = settings.arguments;
         return MaterialPageRoute(
           builder: (_) => DeliveryDetailScreen(order: args),
@@ -123,6 +122,7 @@ class AppNavigator {
 
       // ==================== SHARED SCREENS ====================
       case AppRoutes.profile:
+        // This is the shared profile - used by buyers
         return MaterialPageRoute(builder: (_) => const ProfileScreen());
       
       case AppRoutes.orders:

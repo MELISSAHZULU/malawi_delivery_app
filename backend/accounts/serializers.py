@@ -1,5 +1,3 @@
-# backend/accounts/serializers.py
-
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -11,47 +9,60 @@ User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
     store_name = serializers.SerializerMethodField()
+    seller_address = serializers.SerializerMethodField()
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'role', 'phone_number', 'profile_picture', 'is_verified', 'location', 'store_name']
+        fields = ['id', 'username', 'email', 'role', 'phone_number', 'profile_picture', 
+                  'is_verified', 'location', 'store_name', 'seller_address']
     
     def get_store_name(self, obj):
         if hasattr(obj, 'seller_profile'):
             return obj.seller_profile.store_name
         return None
+    
+    def get_seller_address(self, obj):
+        if hasattr(obj, 'seller_profile'):
+            return obj.seller_profile.address
+        return obj.location
 
 
 class SellerProfileSerializer(serializers.ModelSerializer):
-    phone_number = serializers.CharField(source='user.phone_number', required=False, allow_blank=True)
-    location = serializers.CharField(source='user.location', required=False, allow_blank=True)
+    # These fields will be handled manually in update
+    phone_number = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    location = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    seller_address = serializers.CharField(write_only=True, required=False, allow_blank=True)
     
     class Meta:
         model = SellerProfile
         fields = [
             'store_name', 'store_description', 'address', 'delivery_fee', 
-            'phone_number', 'location', 'is_active', 'opening_hours'
+            'phone_number', 'location', 'seller_address', 'is_active', 'opening_hours'
         ]
+        read_only_fields = ['is_active']
     
     def update(self, instance, validated_data):
-        # Handle nested user fields
-        user_data = {}
-        if 'phone_number' in validated_data:
-            user_data['phone_number'] = validated_data.pop('phone_number')
-        if 'location' in validated_data:
-            user_data['location'] = validated_data.pop('location')
+        # Extract user-related fields
+        phone_number = validated_data.pop('phone_number', None)
+        location = validated_data.pop('location', None)
+        seller_address = validated_data.pop('seller_address', None)
         
-        # Update seller profile
+        # Update seller profile fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
         
-        # Update user
-        if user_data:
-            user = instance.user
-            for attr, value in user_data.items():
-                setattr(user, attr, value)
-            user.save()
+        # Update user fields
+        user = instance.user  # Get the User instance
+        if phone_number is not None:
+            user.phone_number = phone_number
+        if location is not None:
+            user.location = location
+        if seller_address is not None:
+            # Store seller address in the seller profile address field
+            instance.address = seller_address
+            instance.save()
+        user.save()
         
         return instance
 
@@ -120,7 +131,21 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class ProfileSerializer(serializers.ModelSerializer):
+    store_name = serializers.SerializerMethodField()
+    seller_address = serializers.SerializerMethodField()
+    
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'phone_number', 'profile_picture', 'location', 'role']
+        fields = ['id', 'username', 'email', 'phone_number', 'profile_picture', 
+                  'location', 'role', 'store_name', 'seller_address']
         read_only_fields = ['id', 'role']
+    
+    def get_store_name(self, obj):
+        if hasattr(obj, 'seller_profile'):
+            return obj.seller_profile.store_name
+        return None
+    
+    def get_seller_address(self, obj):
+        if hasattr(obj, 'seller_profile'):
+            return obj.seller_profile.address
+        return obj.location
