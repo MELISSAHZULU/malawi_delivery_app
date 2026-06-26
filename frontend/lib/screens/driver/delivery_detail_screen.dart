@@ -17,7 +17,7 @@ class DeliveryDetailScreen extends StatefulWidget {
 
 class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
   final MapController _mapController = MapController();
-  dynamic _order;
+  Map<String, dynamic>? _order;
   bool _isLoading = true;
 
   // Default coordinates (Lilongwe, Malawi)
@@ -42,65 +42,69 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     setState(() => _isLoading = true);
     
     try {
-      // Check if order was passed directly to widget
-      if (widget.order != null) {
-        _order = widget.order;
-        print('✅ Order loaded from widget');
-      } else {
-        // Try to get from route arguments
+      dynamic orderData = widget.order;
+      
+      // If widget.order is null, try to get from route arguments
+      if (orderData == null) {
         final args = ModalRoute.of(context)?.settings.arguments;
         print('📦 Route arguments: $args');
-        
-        if (args != null) {
-          // Handle different argument types
-          if (args is Map) {
-            // Check if it has order_details (from assignment API)
-            if (args.containsKey('order_details')) {
-              _order = args['order_details'];
-              print('✅ Extracted order_details from map');
-            } else if (args.containsKey('order')) {
-              _order = args['order'];
-              print('✅ Extracted order from map');
-            } else {
-              // Try to use the map itself as order data
-              _order = args;
-              print('✅ Using args map as order data');
-            }
-          } else if (args is String) {
-            // If it's a string ID, find the order
-            final driverProvider = Provider.of<DriverProvider>(context, listen: false);
-            final results = driverProvider.assignedOrders
-                .where((o) => o.id.toString() == args || o.orderNumber == args);
-            if (results.isNotEmpty) {
-              _order = results.first;
-              print('✅ Found order by ID: ${_order.orderNumber}');
-            } else {
-              print('❌ Order not found with ID: $args');
-              _order = null;
-            }
-          } else {
-            _order = args;
-            print('✅ Using args directly');
+        orderData = args;
+      }
+      
+      if (orderData == null) {
+        print('❌ No order data found');
+        _order = null;
+        return;
+      }
+      
+      // Handle different data formats
+      if (orderData is Map) {
+        // Check if it has order_details (nested data from assignment)
+        if (orderData.containsKey('order_details') && orderData['order_details'] is Map) {
+          final details = orderData['order_details'] as Map;
+          _order = Map<String, dynamic>.from(details);
+          print('✅ Extracted order_details: ${_order?['order_number']}');
+        } else {
+          _order = Map<String, dynamic>.from(orderData);
+          print('✅ Using order data directly: ${_order?['order_number']}');
+        }
+      } else if (orderData is String) {
+        // If it's a string ID, try to find the order
+        final driverProvider = Provider.of<DriverProvider>(context, listen: false);
+        final results = driverProvider.assignedOrders
+            .where((o) => o.id.toString() == orderData || o.orderNumber == orderData);
+        if (results.isNotEmpty) {
+          final found = results.first;
+          try {
+            _order = Map<String, dynamic>.from(found.toJson());
+            print('✅ Found order by ID: ${_order?['order_number']}');
+          } catch (e) {
+            print('❌ Could not convert found order to map: $e');
           }
         }
-      }
-      
-      // If order is a Map and has id but no order_number, try to find it
-      if (_order is Map && _order.containsKey('id') && !_order.containsKey('order_number')) {
-        final driverProvider = Provider.of<DriverProvider>(context, listen: false);
-        final orderId = _order['id'].toString();
-        final results = driverProvider.assignedOrders
-            .where((o) => o.id.toString() == orderId);
-        if (results.isNotEmpty) {
-          _order = results.first;
-          print('✅ Found order by ID from map: ${_order.orderNumber}');
+      } else {
+        // Try to convert to map
+        try {
+          _order = Map<String, dynamic>.from(orderData.toJson());
+          print('✅ Converted order to map: ${_order?['order_number']}');
+        } catch (e) {
+          print('❌ Could not convert order to map: $e');
+          _order = null;
         }
       }
       
+      // If we have an order but it's missing data, try to enrich it
       if (_order != null) {
+        // Check if we need to extract from order_details (if it's still nested)
+        if (_order!.containsKey('order_details') && _order!['order_details'] is Map) {
+          final details = _order!['order_details'] as Map;
+          _order = Map<String, dynamic>.from(details);
+          print('✅ Extracted nested order_details: ${_order?['order_number']}');
+        }
+        
         _setupLocations();
-        print('✅ Order loaded successfully');
-        print('📦 Order data: $_order');
+        print('✅ Order loaded successfully: ${_order?['order_number']}');
+        print('📦 Order data keys: ${_order?.keys}');
       } else {
         print('❌ Order is null after loading');
       }
@@ -116,44 +120,26 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
 
   void _setupLocations() {
     try {
-      // Handle both Map and Order object
-      final isMap = _order is Map;
+      if (_order == null) return;
       
-      if (isMap) {
-        // Handle Map data
-        final sellerLat = _order['seller_latitude'] ?? _order['sellerLatitude'];
-        final sellerLng = _order['seller_longitude'] ?? _order['sellerLongitude'];
-        final deliveryLat = _order['delivery_latitude'] ?? _order['deliveryLatitude'];
-        final deliveryLng = _order['delivery_longitude'] ?? _order['deliveryLongitude'];
-        
-        if (sellerLat != null && sellerLng != null) {
-          _pickupLocation = LatLng(
-            double.parse(sellerLat.toString()),
-            double.parse(sellerLng.toString()),
-          );
-        }
-        
-        if (deliveryLat != null && deliveryLng != null) {
-          _deliveryLocation = LatLng(
-            double.parse(deliveryLat.toString()),
-            double.parse(deliveryLng.toString()),
-          );
-        }
-      } else {
-        // Handle Order object
-        if (_order.sellerLatitude != null && _order.sellerLongitude != null) {
-          _pickupLocation = LatLng(
-            _order.sellerLatitude,
-            _order.sellerLongitude,
-          );
-        }
-        
-        if (_order.deliveryLatitude != null && _order.deliveryLongitude != null) {
-          _deliveryLocation = LatLng(
-            _order.deliveryLatitude,
-            _order.deliveryLongitude,
-          );
-        }
+      // Get location data from map
+      final sellerLat = _order?['seller_latitude'] ?? _order?['sellerLatitude'];
+      final sellerLng = _order?['seller_longitude'] ?? _order?['sellerLongitude'];
+      final deliveryLat = _order?['delivery_latitude'] ?? _order?['deliveryLatitude'];
+      final deliveryLng = _order?['delivery_longitude'] ?? _order?['deliveryLongitude'];
+      
+      if (sellerLat != null && sellerLng != null) {
+        _pickupLocation = LatLng(
+          double.parse(sellerLat.toString()),
+          double.parse(sellerLng.toString()),
+        );
+      }
+      
+      if (deliveryLat != null && deliveryLng != null) {
+        _deliveryLocation = LatLng(
+          double.parse(deliveryLat.toString()),
+          double.parse(deliveryLng.toString()),
+        );
       }
     } catch (e) {
       print('Error setting up locations: $e');
@@ -228,66 +214,94 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
     }
   }
 
-  // Helper to get value from order (handles both Map and Object)
+  // Helper to get value from order map - SAFE with null check
   dynamic _getOrderValue(String key, {dynamic defaultValue}) {
-    if (_order == null) return defaultValue;
-    if (_order is Map) {
-      return _order[key] ?? defaultValue;
-    }
-    // Try to get property from object
-    try {
-      return _order[key] ?? defaultValue;
-    } catch (_) {
+    // Return default if order is null
+    if (_order == null) {
+      print('⚠️ Order is null, returning default for key: $key');
       return defaultValue;
     }
+    
+    // Check multiple possible key names
+    final possibleKeys = [key];
+    
+    // Handle common variations
+    if (key == 'order_number') {
+      possibleKeys.addAll(['orderNumber', 'order_no']);
+    } else if (key == 'seller_name') {
+      possibleKeys.addAll(['sellerName', 'store_name', 'storeName']);
+    } else if (key == 'seller_address') {
+      possibleKeys.addAll(['sellerAddress', 'store_address', 'storeAddress']);
+    } else if (key == 'delivery_address') {
+      possibleKeys.addAll(['deliveryAddress', 'address']);
+    } else if (key == 'customer_name') {
+      possibleKeys.addAll(['customerName', 'buyer_name', 'buyerName']);
+    } else if (key == 'customer_phone') {
+      possibleKeys.addAll(['customerPhone', 'buyer_phone', 'buyerPhone']);
+    } else if (key == 'delivery_fee') {
+      possibleKeys.addAll(['deliveryFee', 'fee', 'driver_fee', 'driverFee']);
+    }
+    
+    for (final k in possibleKeys) {
+      if (_order!.containsKey(k) && _order![k] != null) {
+        return _order![k];
+      }
+    }
+    
+    return defaultValue;
   }
 
   String _getOrderNumber() {
-    return _getOrderValue('order_number', defaultValue: 'N/A') ?? 'N/A';
+    final value = _getOrderValue('order_number', defaultValue: 'N/A');
+    return value?.toString() ?? 'N/A';
   }
 
   String _getStatus() {
-    return _getOrderValue('status', defaultValue: 'pending') ?? 'pending';
+    final value = _getOrderValue('status', defaultValue: 'pending');
+    return value?.toString() ?? 'pending';
   }
 
   String _getSellerName() {
-    return _getOrderValue('seller_name', defaultValue: 'Store') ?? 'Store';
+    final value = _getOrderValue('seller_name', defaultValue: 'Store');
+    return value?.toString() ?? 'Store';
   }
 
   String _getSellerAddress() {
-    return _getOrderValue('seller_address', defaultValue: 'Pickup location') ?? 'Pickup location';
+    final value = _getOrderValue('seller_address', defaultValue: '');
+    return value?.toString() ?? '';
   }
 
   String _getDeliveryAddress() {
-    return _getOrderValue('delivery_address', defaultValue: 'Delivery location') ?? 'Delivery location';
+    final value = _getOrderValue('delivery_address', defaultValue: 'Delivery location');
+    return value?.toString() ?? 'Delivery location';
   }
 
   String _getCustomerName() {
-    return _getOrderValue('customer_name', defaultValue: 'Customer') ?? 'Customer';
+    final value = _getOrderValue('customer_name', defaultValue: 'Customer');
+    return value?.toString() ?? 'Customer';
   }
 
   String _getCustomerPhone() {
-    return _getOrderValue('customer_phone', defaultValue: '') ?? '';
+    final value = _getOrderValue('customer_phone', defaultValue: '');
+    return value?.toString() ?? '';
   }
 
   String _getDriverName() {
-    return _getOrderValue('driver_name', defaultValue: 'Driver') ?? 'Driver';
+    final value = _getOrderValue('driver_name', defaultValue: 'Driver');
+    return value?.toString() ?? 'Driver';
   }
 
   String _getDriverPhone() {
-    return _getOrderValue('driver_phone', defaultValue: '') ?? '';
+    final value = _getOrderValue('driver_phone', defaultValue: '');
+    return value?.toString() ?? '';
   }
 
-  double _getTotal() {
-    final total = _getOrderValue('total', defaultValue: 0.0);
-    if (total is double) return total;
-    if (total is int) return total.toDouble();
-    if (total is String) return double.tryParse(total) ?? 0.0;
-    return 0.0;
-  }
-
-  List<dynamic> _getItems() {
-    return _getOrderValue('items', defaultValue: []) ?? [];
+  double _getDeliveryFee() {
+    final value = _getOrderValue('delivery_fee', defaultValue: 1500.0);
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 1500.0;
+    return 1500.0;
   }
 
   @override
@@ -401,12 +415,28 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                                       color: Colors.grey,
                                     ),
                                   ),
-                                  Text(
-                                    Formatters.currencyFormat(_getTotal()),
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green,
+                                  // Show only delivery fee, not full amount
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.shade50,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.green.shade200),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.motorcycle, size: 14, color: Colors.green.shade700),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Fee: ${Formatters.currencyFormat(_getDeliveryFee())}',
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.green,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
@@ -417,7 +447,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                                 iconColor: Colors.blue,
                                 title: 'Pickup from',
                                 subtitle: _getSellerName(),
-                                address: _getSellerAddress(),
+                                address: _getSellerAddress().isNotEmpty ? _getSellerAddress() : 'Pickup location',
                               ),
                               const SizedBox(height: 8),
                               _buildLocationRow(
@@ -428,41 +458,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                                 address: _getDeliveryAddress(),
                               ),
                               const SizedBox(height: 12),
-                              if (_getItems().isNotEmpty) ...[
-                                const Divider(),
-                                const Text(
-                                  'Order Items',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                ..._getItems().map((item) => Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          '${item['quantity'] ?? 0}x ${item['name'] ?? 'Item'}',
-                                          style: const TextStyle(fontSize: 14),
-                                        ),
-                                      ),
-                                      Text(
-                                        Formatters.currencyFormat(
-                                          (item['price'] ?? 0) * (item['quantity'] ?? 0)
-                                        ),
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                )),
-                              ],
-                              const SizedBox(height: 8),
+                              
                               const Divider(),
                               Row(
                                 children: [
@@ -747,7 +743,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                 child: Text(
                   isDriving 
                     ? '📍 ${_getDeliveryAddress()}'
-                    : '📍 ${_getSellerName()}',
+                    : '📍 ${_getSellerName()}\n${_getSellerAddress()}',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
@@ -767,7 +763,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                 
                 final messenger = ScaffoldMessenger.of(context);
                 final success = await driverProvider.updateDeliveryStatus(
-                  orderId.toString(),
+                  orderId?.toString() ?? '',
                   action
                 );
                 
@@ -779,7 +775,6 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
                 );
                 
                 if (success && mounted) {
-                  // Refresh the page
                   _loadOrderData();
                 }
               },
