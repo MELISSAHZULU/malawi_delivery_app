@@ -288,7 +288,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Menu Items
+            // Menu Items - Driver Specific
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -302,15 +302,6 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               ),
               child: Column(
                 children: [
-                  _buildMenuItem(
-                    icon: Icons.history,
-                    title: 'Order History',
-                    subtitle: 'View all your orders',
-                    onTap: () {
-                      Navigator.pushReplacementNamed(context, AppRoutes.orderHistory);
-                    },
-                  ),
-                  _buildDivider(),
                   _buildMenuItem(
                     icon: Icons.delivery_dining,
                     title: 'Delivery History',
@@ -339,11 +330,11 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                   ),
                   _buildDivider(),
                   _buildMenuItem(
-                    icon: Icons.help,
+                    icon: Icons.help_outline,
                     title: 'Help & Support',
-                    subtitle: 'Get help with deliveries',
+                    subtitle: 'Driver support, FAQs, and assistance',
                     onTap: () {
-                      Navigator.pushNamed(context, AppRoutes.helpSupport);
+                      _showDriverHelpDialog(context);
                     },
                   ),
                 ],
@@ -488,6 +479,391 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
     );
   }
 
+  void _showDriverHelpDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Driver Help & Support',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHelpItem(
+              icon: Icons.support_agent,
+              title: 'Contact Support',
+              subtitle: 'Reach out to our support team',
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Support chat coming soon!'),
+                    backgroundColor: Colors.blue,
+                  ),
+                );
+              },
+            ),
+            const Divider(height: 1),
+            _buildHelpItem(
+              icon: Icons.help_outline,
+              title: 'Frequently Asked Questions',
+              subtitle: 'Common questions for drivers',
+              onTap: () {
+                Navigator.pop(context);
+                _showDriverFAQDialog(context);
+              },
+            ),
+            const Divider(height: 1),
+            _buildHelpItem(
+              icon: Icons.report_problem,
+              title: 'Report an Issue',
+              subtitle: 'Report delivery or app issues',
+              onTap: () {
+                Navigator.pop(context);
+                _showReportIssueDialog(context);
+              },
+            ),
+            const Divider(height: 1),
+            _buildHelpItem(
+              icon: Icons.directions_car,
+              title: 'Delivery Guidelines',
+              subtitle: 'Best practices for deliveries',
+              onTap: () {
+                Navigator.pop(context);
+                _showDeliveryGuidelinesDialog(context);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHelpItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Icon(icon, color: const Color(0xFF2A7DE1), size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: Color(0xFF0A1A2B),
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.grey),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDriverFAQDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Frequently Asked Questions',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildFAQItem(
+                question: 'How do I accept a delivery?',
+                answer: 'Go to the Deliveries screen and tap "Accept" on available orders.',
+              ),
+              const Divider(height: 1),
+              _buildFAQItem(
+                question: 'How do I navigate to the customer?',
+                answer: 'Tap the "Navigate" button in the delivery details to open Google Maps.',
+              ),
+              const Divider(height: 1),
+              _buildFAQItem(
+                question: 'How are earnings calculated?',
+                answer: 'Earnings are based on delivery fees. You earn MWK 1,500 per completed delivery.',
+              ),
+              const Divider(height: 1),
+              _buildFAQItem(
+                question: 'What if I have an issue with an order?',
+                answer: 'Contact support through the Help & Support section.',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFAQItem({required String question, required String answer}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            question,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: Color(0xFF0A1A2B),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            answer,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showReportIssueDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Report an Issue',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Choose the type of issue you\'re experiencing:',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            _buildIssueOption(
+              icon: Icons.delivery_dining,
+              title: 'Delivery Issue',
+              subtitle: 'Problems with a delivery',
+            ),
+            const Divider(height: 1),
+            _buildIssueOption(
+              icon: Icons.payment,
+              title: 'Payment Issue',
+              subtitle: 'Payment or earnings problem',
+            ),
+            const Divider(height: 1),
+            _buildIssueOption(
+              icon: Icons.bug_report,
+              title: 'App Issue',
+              subtitle: 'Technical or app problem',
+            ),
+            const Divider(height: 1),
+            _buildIssueOption(
+              icon: Icons.people,
+              title: 'Customer Issue',
+              subtitle: 'Problem with a customer',
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Thank you! Our team will review your report.'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2A7DE1),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Submit Report'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIssueOption({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, color: const Color(0xFF2A7DE1), size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: Color(0xFF0A1A2B),
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeliveryGuidelinesDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Delivery Guidelines',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildGuidelineItem(
+                icon: Icons.check_circle,
+                text: 'Always arrive on time for pickup',
+                color: Colors.green,
+              ),
+              const Divider(height: 1),
+              _buildGuidelineItem(
+                icon: Icons.phone,
+                text: 'Contact the customer before arrival',
+                color: Colors.blue,
+              ),
+              const Divider(height: 1),
+              _buildGuidelineItem(
+                icon: Icons.handshake,
+                text: 'Be polite and professional',
+                color: Colors.purple,
+              ),
+              const Divider(height: 1),
+              _buildGuidelineItem(
+                icon: Icons.note,
+                text: 'Verify the order before handing over',
+                color: Colors.orange,
+              ),
+              const Divider(height: 1),
+              _buildGuidelineItem(
+                icon: Icons.rate_review,
+                text: 'Ask for rating after delivery',
+                color: Colors.amber,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGuidelineItem({
+    required IconData icon,
+    required String text,
+    required Color color,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF0A1A2B),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -507,7 +883,6 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               Navigator.pop(context);
               final authProvider = Provider.of<AuthProvider>(context, listen: false);
               final driverProvider = Provider.of<DriverProvider>(context, listen: false);
-              // reset() is void, don't use await
               driverProvider.reset();
               await authProvider.logout();
               if (context.mounted) {
