@@ -8,6 +8,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../providers/order_provider.dart';
 import '../../utils/formatters.dart';
 import '../../models/order.dart';
+import '../../routes/app_routes.dart';
 
 class OrderTrackingScreen extends StatefulWidget {
   final String orderId;
@@ -21,12 +22,13 @@ class OrderTrackingScreen extends StatefulWidget {
 class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   bool _isLoading = true;
   String? _error;
-  late WebSocketChannel _channel;
+  WebSocketChannel? _channel;
   Order? _order;
   String _orderStatus = 'pending';
   String _estimatedArrival = 'Calculating...';
   String _latestArrival = 'Calculating...';
-  bool _showMap = true;
+  bool _showMap = false;
+  bool _isWebSocketConnected = false;
 
   final MapController _mapController = MapController();
   static const LatLng _defaultLocation = LatLng(-13.9626, 33.7741);
@@ -39,14 +41,22 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   void initState() {
     super.initState();
     _loadOrder();
-    _connectWebSocket();
   }
 
   @override
   void dispose() {
-    _channel.sink.close();
+    _channel?.sink.close();
     _mapController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // If we have an order and no WebSocket connection, try to connect
+    if (_order != null && _order!.id.isNotEmpty && _order!.id != '0') {
+      _connectWebSocket(_order!.id);
+    }
   }
 
   Future<void> _loadOrder() async {
@@ -61,7 +71,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       
       Order? foundOrder;
       
-      if (widget.orderId.isEmpty) {
+      if (widget.orderId.isEmpty || widget.orderId == '0') {
         if (orderProvider.orders.isNotEmpty) {
           foundOrder = orderProvider.orders.first;
         }
@@ -84,6 +94,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           _setupLocations(order);
           _updateETA(order);
         });
+        if (order.id.isNotEmpty && order.id != '0') {
+          _connectWebSocket(order.id);
+        }
       } else {
         setState(() => _error = 'No orders found');
       }
@@ -126,26 +139,40 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     return '$hour12:$minute $ampm';
   }
 
-  void _connectWebSocket() {
+  void _connectWebSocket(String orderId) {
+    if (orderId.isEmpty || orderId == '0') {
+      return;
+    }
+
     try {
-      final wsUrl = 'ws://localhost:8000/ws/delivery/${widget.orderId}/';
+      final wsUrl = 'ws://localhost:8000/ws/delivery/$orderId/';
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+      _isWebSocketConnected = true;
       
-      _channel.stream.listen(
+      _channel!.stream.listen(
         (data) {
-          final event = jsonDecode(data);
-          _handleWebSocketEvent(event);
+          try {
+            final event = jsonDecode(data);
+            _handleWebSocketEvent(event);
+          } catch (e) {
+            print('Error parsing WebSocket message: $e');
+          }
         },
-        onError: (error) => print('WebSocket error: $error'),
+        onError: (error) {
+          print('WebSocket error: $error');
+          _isWebSocketConnected = false;
+        },
         onDone: () {
-          Future.delayed(const Duration(seconds: 3), () {
-            if (mounted) _connectWebSocket();
+          _isWebSocketConnected = false;
+          Future.delayed(const Duration(seconds: 5), () {
+            if (mounted && _order != null && _order!.id.isNotEmpty) {
+              _connectWebSocket(_order!.id);
+            }
           });
         },
       );
     } catch (e) {
-      print('WebSocket connection failed, using polling');
-      _startPolling();
+      _isWebSocketConnected = false;
     }
   }
 
@@ -193,15 +220,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       driverRating: event['rating'] as double? ?? _order!.driverRating,
       assignmentId: event['assignment_id'] as String? ?? _order!.assignmentId,
     );
-  }
-
-  void _startPolling() {
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted) {
-        _loadOrder();
-        _startPolling();
-      }
-    });
   }
 
   LatLng get _mapCenter {
@@ -278,51 +296,81 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text('Track Order'),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        foregroundColor: const Color(0xFF0A1A2B),
-        actions: [
-          IconButton(
-            icon: Icon(_showMap ? Icons.list : Icons.map),
-            onPressed: () => setState(() => _showMap = !_showMap),
+    return WillPopScope(
+      onWillPop: () async {
+        // Navigate back to home screen when back button is pressed
+        Navigator.pushReplacementNamed(context, AppRoutes.buyerHome);
+        return false; // We already handled navigation
+      },
+      child: Scaffold(
+        backgroundColor: Colors.grey.shade50,
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              // Navigate to home screen when back button is pressed
+              Navigator.pushReplacementNamed(context, AppRoutes.buyerHome);
+            },
           ),
-          if (_order?.driverPhone != null && _order!.driverPhone!.isNotEmpty)
+          title: const Text('Track Order'),
+          backgroundColor: Colors.white,
+          elevation: 0,
+          foregroundColor: const Color(0xFF0A1A2B),
+          actions: [
             IconButton(
-              icon: const Icon(Icons.phone, color: Colors.green),
-              onPressed: () => _makePhoneCall(_order!.driverPhone!),
+              icon: Icon(_showMap ? Icons.list : Icons.map),
+              onPressed: () => setState(() => _showMap = !_showMap),
             ),
-        ],
+            if (_order?.driverPhone != null && _order!.driverPhone!.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.phone, color: Colors.green),
+                onPressed: () => _makePhoneCall(_order!.driverPhone!),
+              ),
+          ],
+        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? _buildErrorState()
+                : _order == null
+                    ? _buildEmptyState()
+                    : _showMap
+                        ? _buildMapView()
+                        : _buildListView(),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? _buildErrorState()
-              : _order == null
-                  ? _buildEmptyState()
-                  : _showMap
-                      ? _buildMapView()
-                      : _buildListView(),
     );
   }
 
+  // ==================== MAP VIEW ====================
   Widget _buildMapView() {
     return Column(
       children: [
-        Expanded(flex: 45, child: _buildMap()),
-        Expanded(flex: 20, child: _buildStatusAndDriverInfo()),
-        Expanded(flex: 35, child: _buildDetailsAndTimeline()),
+        Expanded(
+          flex: 50,
+          child: _buildMap(),
+        ),
+        Expanded(
+          flex: 50,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+                _buildStatusAndDriverInfo(),
+                const SizedBox(height: 12),
+                _buildTimeline(),
+                const SizedBox(height: 12),
+                _buildOrderSummary(),
+                const SizedBox(height: 12),
+                _buildDeliveryAddress(),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
 
+  // ==================== LIST VIEW ====================
   Widget _buildListView() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -336,18 +384,22 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           _buildOrderSummary(),
           const SizedBox(height: 16),
           _buildDeliveryAddress(),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
+  // ==================== MAP ====================
   Widget _buildMap() {
     return Stack(
       children: [
         FlutterMap(
           mapController: _mapController,
-          options: MapOptions(initialCenter: _mapCenter, initialZoom: 14),
+          options: MapOptions(
+            initialCenter: _mapCenter,
+            initialZoom: 14,
+          ),
           children: [
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -413,20 +465,35 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           ],
         ),
         Positioned(
-          top: 16,
-          right: 16,
+          top: 8,
+          right: 8,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16),
               boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.2), blurRadius: 8)],
             ),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF22C55E), shape: BoxShape.circle)),
-                const SizedBox(width: 8),
-                const Text('LIVE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF0A1A2B))),
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: _isWebSocketConnected ? Colors.green : Colors.orange,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _isWebSocketConnected ? 'LIVE' : 'POLLING',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 10,
+                    color: _isWebSocketConnected ? Colors.green : Colors.orange,
+                  ),
+                ),
               ],
             ),
           ),
@@ -435,13 +502,14 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     );
   }
 
+  // ==================== STATUS & DRIVER INFO ====================
   Widget _buildStatusAndDriverInfo() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10)],
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 8)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -452,56 +520,56 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Estimated Arrival', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const Text('Estimated Arrival', style: TextStyle(fontSize: 11, color: Colors.grey)),
                   const SizedBox(height: 2),
-                  Text(_estimatedArrival, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0A1A2B))),
-                  Text('Latest arrival by $_latestArrival', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                  Text(_estimatedArrival, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0A1A2B))),
+                  Text('Latest by $_latestArrival', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: _statusColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Row(
                   children: [
-                    Icon(_statusIcon, color: _statusColor, size: 16),
+                    Icon(_statusIcon, color: _statusColor, size: 14),
                     const SizedBox(width: 4),
-                    Text(_statusDisplay, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _statusColor)),
+                    Text(_statusDisplay, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _statusColor)),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           if (_order?.driverName != null && _order!.driverName!.isNotEmpty)
             Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(8)),
               child: Row(
                 children: [
                   CircleAvatar(
-                    radius: 20,
+                    radius: 16,
                     backgroundColor: const Color(0xFF2A7DE1),
-                    child: Text(_order!.driverName![0].toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                    child: Text(_order!.driverName![0].toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(_order!.driverName!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        Text(_order!.driverName!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                         Row(
                           children: [
-                            const Icon(Icons.star, color: Colors.amber, size: 14),
+                            const Icon(Icons.star, color: Colors.amber, size: 12),
                             const SizedBox(width: 4),
-                            Text(_order?.driverRating?.toStringAsFixed(1) ?? '4.8', style: const TextStyle(fontSize: 12)),
-                            const SizedBox(width: 8),
-                            Container(width: 4, height: 4, decoration: const BoxDecoration(color: Colors.grey, shape: BoxShape.circle)),
-                            const SizedBox(width: 8),
+                            Text(_order?.driverRating?.toStringAsFixed(1) ?? '4.8', style: const TextStyle(fontSize: 11)),
+                            const SizedBox(width: 6),
+                            Container(width: 3, height: 3, decoration: const BoxDecoration(color: Colors.grey, shape: BoxShape.circle)),
+                            const SizedBox(width: 6),
                             if (_order?.driverVehicle != null && _order!.driverVehicle!.isNotEmpty)
-                              Text(_order!.driverVehicle!, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                              Text(_order!.driverVehicle!, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                           ],
                         ),
                       ],
@@ -509,8 +577,10 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                   ),
                   if (_order?.driverPhone != null && _order!.driverPhone!.isNotEmpty)
                     IconButton(
-                      icon: const Icon(Icons.phone, color: Color(0xFF2A7DE1)),
+                      icon: const Icon(Icons.phone, color: Color(0xFF2A7DE1), size: 20),
                       onPressed: () => _makePhoneCall(_order!.driverPhone!),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
                     ),
                 ],
               ),
@@ -520,37 +590,33 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     );
   }
 
+  // ==================== TIMELINE ====================
   Widget _buildTimeline() {
     final steps = [
-      {'label': 'Order Placed', 'icon': Icons.shopping_bag},
+      {'label': 'Placed', 'icon': Icons.shopping_bag},
       {'label': 'Preparing', 'icon': Icons.restaurant},
       {'label': 'On The Way', 'icon': Icons.delivery_dining},
       {'label': 'Delivered', 'icon': Icons.check_circle},
     ];
 
     int currentStep = 0;
-    if (_isDelivered) {
-      currentStep = 3;
-    } else if (_isDriving) {
-      currentStep = 2;
-    } else if (_isPreparing) {
-      currentStep = 1;
-    } else if (_isPending) {
-      currentStep = 0;
-    }
+    if (_isDelivered) currentStep = 3;
+    else if (_isDriving) currentStep = 2;
+    else if (_isPreparing) currentStep = 1;
+    else if (_isPending) currentStep = 0;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10)],
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 8)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Order Progress', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
+          const Text('Progress', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
           ...steps.asMap().entries.map((entry) {
             final index = entry.key;
             final step = entry.value;
@@ -558,73 +624,57 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
             final isActive = index == currentStep;
 
             return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.symmetric(vertical: 2),
               child: Row(
                 children: [
                   Container(
-                    width: 32,
-                    height: 32,
+                    width: 24,
+                    height: 24,
                     decoration: BoxDecoration(
-                      color: isComplete 
-                          ? Colors.green 
-                          : (isActive ? const Color(0xFF2A7DE1) : Colors.grey.shade200),
+                      color: isComplete ? Colors.green : (isActive ? const Color(0xFF2A7DE1) : Colors.grey.shade200),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       isComplete ? Icons.check : step['icon'] as IconData,
-                      size: 16,
+                      size: 12,
                       color: (isComplete || isActive) ? Colors.white : Colors.grey.shade600,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          step['label'] as String,
-                          style: TextStyle(
-                            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                            color: (isComplete || isActive) ? const Color(0xFF0A1A2B) : Colors.grey.shade600,
-                          ),
-                        ),
-                        if (isActive && !_isDelivered)
-                          Container(
-                            margin: const EdgeInsets.only(top: 2),
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'In progress...',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF2A7DE1),
-                              ),
-                            ),
-                          ),
-                        if (isComplete && index == steps.length - 1)
-                          Container(
-                            margin: const EdgeInsets.only(top: 2),
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'Delivered! 🎉',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
-                              ),
-                            ),
-                          ),
-                      ],
+                    child: Text(
+                      step['label'] as String,
+                      style: TextStyle(
+                        fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 13,
+                        color: (isComplete || isActive) ? const Color(0xFF0A1A2B) : Colors.grey.shade600,
+                      ),
                     ),
                   ),
+                  if (isActive && !_isDelivered)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'Live',
+                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF2A7DE1)),
+                      ),
+                    ),
+                  if (isComplete && index == steps.length - 1)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'Done!',
+                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.green),
+                      ),
+                    ),
                 ],
               ),
             );
@@ -634,29 +684,14 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     );
   }
 
-  Widget _buildDetailsAndTimeline() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          _buildOrderSummary(),
-          const SizedBox(height: 16),
-          _buildDeliveryAddress(),
-          const SizedBox(height: 16),
-          _buildTimeline(),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
+  // ==================== ORDER SUMMARY ====================
   Widget _buildOrderSummary() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10)],
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 8)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -664,28 +699,28 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Order #${_order?.orderNumber ?? widget.orderId}', style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-              Text(Formatters.currencyFormat(_order?.total ?? 0), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0A1A2B))),
+              Text('#${_order?.orderNumber ?? widget.orderId}', style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+              Text(Formatters.currencyFormat(_order?.total ?? 0), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0A1A2B))),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           if (_order?.items.isNotEmpty ?? false)
             ..._order!.items.map((item) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
+              padding: const EdgeInsets.symmetric(vertical: 1),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('${item.quantity}x ${item.name}', style: const TextStyle(fontSize: 13)),
-                  Text(Formatters.currencyFormat(item.price * item.quantity), style: const TextStyle(fontSize: 13)),
+                  Text('${item.quantity}x ${item.name}', style: const TextStyle(fontSize: 12)),
+                  Text(Formatters.currencyFormat(item.price * item.quantity), style: const TextStyle(fontSize: 12)),
                 ],
               ),
             )).toList(),
-          const Divider(),
+          const Divider(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Total Paid', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              Text(Formatters.currencyFormat(_order?.total ?? 0), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0A1A2B))),
+              const Text('Total', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              Text(Formatters.currencyFormat(_order?.total ?? 0), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0A1A2B))),
             ],
           ),
         ],
@@ -693,41 +728,42 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     );
   }
 
+  // ==================== DELIVERY ADDRESS ====================
   Widget _buildDeliveryAddress() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10)],
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 8)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Delivery Address', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
+          const Text('Address', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
           Row(
             children: [
-              const Icon(Icons.location_on, size: 16, color: Color(0xFF2A7DE1)),
-              const SizedBox(width: 8),
+              const Icon(Icons.location_on, size: 14, color: Color(0xFF2A7DE1)),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   _order?.deliveryAddress ?? 'No address',
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
                 ),
               ),
             ],
           ),
           if (_order?.deliveryInstructions != null && _order!.deliveryInstructions!.isNotEmpty) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Row(
               children: [
-                const Icon(Icons.note, size: 16, color: Colors.grey),
-                const SizedBox(width: 8),
+                const Icon(Icons.note, size: 14, color: Colors.grey),
+                const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     _order!.deliveryInstructions!,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
                   ),
                 ),
               ],
@@ -744,35 +780,20 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.inbox_outlined, size: 60, color: Colors.grey.shade400),
+            Icon(Icons.inbox_outlined, size: 50, color: Colors.grey.shade400),
+            const SizedBox(height: 12),
+            const Text('No Orders Yet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0A1A2B))),
+            const SizedBox(height: 4),
+            Text('Place your first order to track it', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
             const SizedBox(height: 16),
-            const Text(
-              'No Orders Yet',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0A1A2B),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Place your first order to track it here',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade600,
-              ),
-            ),
-            const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              icon: const Icon(Icons.arrow_back),
-              label: const Text('Go Back'),
+              onPressed: () => Navigator.pushReplacementNamed(context, AppRoutes.buyerHome),
+              icon: const Icon(Icons.arrow_back, size: 16),
+              label: const Text('Go Back Home'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0A1A2B),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               ),
             ),
           ],
@@ -784,20 +805,20 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, size: 60, color: Colors.grey.shade400),
+          Icon(Icons.error_outline, size: 50, color: Colors.grey.shade400),
+          const SizedBox(height: 12),
+          Text(_error!, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
+          const SizedBox(height: 4),
+          Text('Please go back and try again', style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
           const SizedBox(height: 16),
-          Text(_error!, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
-          const SizedBox(height: 8),
-          Text('Please go back and try again', style: TextStyle(fontSize: 14, color: Colors.grey.shade500)),
-          const SizedBox(height: 24),
           ElevatedButton.icon(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back),
-            label: const Text('Go Back'),
+            onPressed: () => Navigator.pushReplacementNamed(context, AppRoutes.buyerHome),
+            icon: const Icon(Icons.arrow_back, size: 16),
+            label: const Text('Go Back Home'),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF0A1A2B),
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             ),
           ),
         ],
@@ -810,25 +831,15 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.shopping_bag_outlined, size: 60, color: Colors.grey.shade400),
+          Icon(Icons.shopping_bag_outlined, size: 50, color: Colors.grey.shade400),
+          const SizedBox(height: 12),
+          const Text('No Active Orders', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0A1A2B))),
+          const SizedBox(height: 4),
+          Text('You don\'t have any active orders', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
           const SizedBox(height: 16),
-          const Text(
-            'No Active Orders',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF0A1A2B),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'You don\'t have any active orders to track',
-            style: TextStyle(color: Colors.grey.shade600),
-          ),
-          const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Go Back'),
+            onPressed: () => Navigator.pushReplacementNamed(context, AppRoutes.buyerHome),
+            child: const Text('Go Back Home'),
           ),
         ],
       ),

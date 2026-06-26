@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/offline_queue_provider.dart';
 import '../../providers/product_provider.dart';
+import '../../providers/order_provider.dart';
 import '../../widgets/product_card.dart';
 import '../../widgets/offline_banner.dart';
 import '../../routes/app_routes.dart';
@@ -33,10 +34,15 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadProducts();
+    _loadOrders();
   }
 
   Future<void> _loadProducts() async {
     await Provider.of<ProductProvider>(context, listen: false).fetchProducts();
+  }
+
+  Future<void> _loadOrders() async {
+    await Provider.of<OrderProvider>(context, listen: false).fetchOrders();
   }
 
   @override
@@ -44,6 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final cartProvider = Provider.of<CartProvider>(context);
     final offlineProvider = Provider.of<OfflineQueueProvider>(context);
     final productProvider = Provider.of<ProductProvider>(context);
+    final orderProvider = Provider.of<OrderProvider>(context);
 
     // Apply category filter
     final filteredProducts = _getFilteredProducts(productProvider.products);
@@ -99,8 +106,8 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Track',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Profile',
+            icon: Icon(Icons.history),
+            label: 'Orders',
           ),
         ],
         onTap: (index) {
@@ -108,20 +115,28 @@ class _HomeScreenState extends State<HomeScreen> {
           if (index == 0) {
             Navigator.popUntil(context, (route) => route.settings.name == AppRoutes.buyerHome);
           } else if (index == 1) {
-            // Navigate to tracking screen with empty orderId (will show latest order)
-            Navigator.pushReplacementNamed(
-              context,
-              AppRoutes.tracking,
-              arguments: '',
-            );
+            _navigateToTracking(orderProvider);
           } else if (index == 2) {
             Navigator.pushReplacementNamed(
               context,
-              AppRoutes.profile,
+              AppRoutes.orderHistory,
             );
           }
         },
       ),
+    );
+  }
+
+  void _navigateToTracking(OrderProvider orderProvider) {
+    String orderId = '';
+    if (orderProvider.orders.isNotEmpty) {
+      orderId = orderProvider.orders.first.id.toString();
+    }
+    
+    Navigator.pushReplacementNamed(
+      context,
+      AppRoutes.tracking,
+      arguments: orderId,
     );
   }
 
