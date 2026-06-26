@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'orders',
     'payments',
     'delivery',
+    'notifications',
 ]
 
 MIDDLEWARE = [
@@ -99,8 +100,13 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
-MEDIA_URL = 'media/'
+
+# ✅ MEDIA CONFIGURATION - For image uploads
+MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# ✅ Create media directory if it doesn't exist
+os.makedirs(MEDIA_ROOT, exist_ok=True)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -110,6 +116,3 @@ PAYCHANGU_SECRET_KEY = os.getenv('PAYCHANGU_SECRET_KEY', '')
 PAYCHANGU_BASE_URL = os.getenv('PAYCHANGU_BASE_URL', 'https://api.paychangu.com/v1')
 PAYCHANGU_CALLBACK_URL = os.getenv('PAYCHANGU_CALLBACK_URL', '')
 PAYCHANGU_REDIRECT_URL = os.getenv('PAYCHANGU_REDIRECT_URL', '')
-
-# Notifications app
-INSTALLED_APPS += ['notifications']

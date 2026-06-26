@@ -3,7 +3,8 @@ class Product {
   final String name;
   final String description;
   final double price;
-  final String? imageUrl;
+  final String? image;  // ✅ Single image field
+  final List<String> images;
   final double rating;
   final String deliveryTime;
   final bool isPremium;
@@ -13,13 +14,15 @@ class Product {
   final int stockQuantity;
   final int? categoryId;
   final String? categoryName;
+  final String unit;
 
   Product({
     required this.id,
     required this.name,
     required this.description,
     required this.price,
-    this.imageUrl,
+    this.image,
+    this.images = const [],
     this.rating = 0.0,
     this.deliveryTime = '20-30 min',
     this.isPremium = false,
@@ -29,10 +32,14 @@ class Product {
     this.stockQuantity = 0,
     this.categoryId,
     this.categoryName,
+    this.unit = 'piece',
   });
 
+  String? get imageUrl => image ?? (images.isNotEmpty ? images.first : null);
+
+  bool get hasImage => image != null || images.isNotEmpty;
+
   factory Product.fromJson(Map<String, dynamic> json) {
-    // Handle price that might be a string or double
     double parsePrice(dynamic price) {
       if (price == null) return 0.0;
       if (price is double) return price;
@@ -44,13 +51,15 @@ class Product {
       return 0.0;
     }
 
-    // Get image from images array if available
-    String? getImage(dynamic images) {
-      if (images == null) return null;
-      if (images is List && images.isNotEmpty) {
-        return images[0].toString();
+    List<String> parseImages(dynamic imagesData) {
+      if (imagesData == null) return [];
+      if (imagesData is List) {
+        return imagesData.map((img) => img.toString()).toList();
       }
-      return null;
+      if (imagesData is String) {
+        return [imagesData];
+      }
+      return [];
     }
 
     return Product(
@@ -58,7 +67,8 @@ class Product {
       name: json['name'] ?? '',
       description: json['description'] ?? '',
       price: parsePrice(json['price']),
-      imageUrl: getImage(json['images']),
+      image: json['image'],
+      images: parseImages(json['images']),
       rating: (json['rating'] ?? 0).toDouble(),
       deliveryTime: '${json['preparation_time'] ?? 15}-${(json['preparation_time'] ?? 15) + 10} min',
       isPremium: json['is_premium'] ?? false,
@@ -68,6 +78,7 @@ class Product {
       stockQuantity: json['stock_quantity'] ?? 0,
       categoryId: json['category'],
       categoryName: json['category_name'],
+      unit: json['unit'] ?? 'piece',
     );
   }
 
@@ -77,7 +88,8 @@ class Product {
       'name': name,
       'description': description,
       'price': price,
-      'image_url': imageUrl,
+      'image': image,
+      'images': images,
       'rating': rating,
       'delivery_time': deliveryTime,
       'is_premium': isPremium,
@@ -87,6 +99,7 @@ class Product {
       'stock_quantity': stockQuantity,
       'category_id': categoryId,
       'category_name': categoryName,
+      'unit': unit,
     };
   }
 }

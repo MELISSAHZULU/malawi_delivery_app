@@ -21,7 +21,11 @@ class Product(models.Model):
     description = models.TextField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
     unit = models.CharField(max_length=20, default='piece')
-    images = models.JSONField(default=list)
+    
+    # ✅ Image fields
+    image = models.ImageField(upload_to='products/', null=True, blank=True)  # Single image upload
+    images = models.JSONField(default=list)  # For multiple images (URLs)
+    
     is_available = models.BooleanField(default=True)
     is_featured = models.BooleanField(default=False)
     is_premium = models.BooleanField(default=False)
@@ -34,6 +38,15 @@ class Product(models.Model):
     
     def __str__(self):
         return f"{self.name} - {self.seller.store_name}"
+    
+    @property
+    def image_url(self):
+        """Get the image URL if available"""
+        if self.image:
+            return self.image.url
+        if self.images and len(self.images) > 0:
+            return self.images[0]
+        return None
 
 class ProductVariant(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants')

@@ -1,10 +1,11 @@
 from rest_framework import generics, filters, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import Category, Product
 from .serializers import CategorySerializer, ProductSerializer, ProductCreateSerializer
-from accounts.models import SellerProfile  # Add this import
+from accounts.models import SellerProfile
 
 class CategoryListView(generics.ListAPIView):
     permission_classes = [AllowAny]
@@ -34,6 +35,7 @@ class ProductDetailView(generics.RetrieveAPIView):
 
 class SellerProductListView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]  # ✅ Added for image upload
     
     def get_serializer_class(self):
         if self.request.method == 'POST':
@@ -41,12 +43,11 @@ class SellerProductListView(generics.ListCreateAPIView):
         return ProductSerializer
     
     def get_queryset(self):
-        # Get products for the logged-in seller
         return Product.objects.filter(seller__user=self.request.user)
     
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
+        serializer = self.get_serializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
     
     def perform_create(self, serializer):
@@ -67,6 +68,7 @@ class SellerProductListView(generics.ListCreateAPIView):
 class SellerProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = ProductCreateSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     
     def get_queryset(self):
         return Product.objects.filter(seller__user=self.request.user)

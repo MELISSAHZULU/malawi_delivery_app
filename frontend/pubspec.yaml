@@ -30,7 +30,7 @@ dependencies:
   
 
   # UI
-  cached_network_image: ^3.3.0
+  cached_network_image: ^3.4.1
   flutter_svg: ^2.0.9
   flutter_rating_bar: ^4.0.1
   intl: ^0.18.1
@@ -41,10 +41,10 @@ dependencies:
   webview_flutter: ^4.5.0
 
   # HTTP
-  http: ^1.1.0
+  http: ^1.6.0
 
   # Image Picker
-  image_picker: ^1.0.7
+  image_picker: ^1.2.2
 
   url_launcher: ^6.2.0
   flutter_map_cancellable_tile_provider: ^2.0.0

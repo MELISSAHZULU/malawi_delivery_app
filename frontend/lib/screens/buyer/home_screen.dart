@@ -412,7 +412,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildFeaturedItems(List<dynamic> products, CartProvider cartProvider) {
-    final featured = products.where((p) => p.isPremium).take(2).toList();
+    final featured = products.where((p) => p.isPremium).take(4).toList();
 
     if (featured.isEmpty) {
       return const SizedBox.shrink();
@@ -425,7 +425,7 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'Featured Items',
+              '🔥 Featured Items',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -443,7 +443,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 200,
+          height: 220,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: featured.length,
@@ -452,128 +452,29 @@ class _HomeScreenState extends State<HomeScreen> {
               return Container(
                 width: 160,
                 margin: const EdgeInsets.only(right: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      height: 100,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(12),
-                        ),
+                child: ProductCard(
+                  name: product.name,
+                  price: product.price,
+                  rating: product.rating,
+                  deliveryTime: product.deliveryTime,
+                  isPremium: product.isPremium,
+                  imageUrl: product.imageUrl,  // ✅ Pass image URL
+                  onTap: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppRoutes.productDetail,
+                      arguments: {'productId': product.id},
+                    );
+                  },
+                  onAddToCart: () {
+                    cartProvider.addItem(price: product.price, name: product.name);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${product.name} added to cart!'),
+                        duration: const Duration(seconds: 1),
                       ),
-                      child: Stack(
-                        children: [
-                          Center(
-                            child: Icon(
-                              Icons.food_bank,
-                              size: 40,
-                              color: Colors.grey.shade400,
-                            ),
-                          ),
-                          if (product.isPremium)
-                            Positioned(
-                              top: 8,
-                              left: 8,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text(
-                                  'PREMIUM',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            product.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              const Icon(Icons.star, size: 12, color: Colors.amber),
-                              Text(
-                                ' ${product.rating}',
-                                style: const TextStyle(fontSize: 11),
-                              ),
-                              const SizedBox(width: 8),
-                              Icon(Icons.access_time, size: 12, color: Colors.grey),
-                              Text(
-                                ' ${product.deliveryTime}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                Formatters.currencyFormat(product.price),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: () {
-                                  cartProvider.addItem(price: product.price, name: product.name);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('${product.name} added to cart!'),
-                                      duration: const Duration(seconds: 1),
-                                    ),
-                                  );
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF0A1A2B),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.add,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
               );
             },
@@ -630,6 +531,7 @@ class _HomeScreenState extends State<HomeScreen> {
           rating: product.rating,
           deliveryTime: product.deliveryTime,
           isPremium: product.isPremium,
+          imageUrl: product.imageUrl,  // ✅ Pass image URL
           onTap: () {
             Navigator.pushNamed(
               context,

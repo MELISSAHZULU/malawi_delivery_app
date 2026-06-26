@@ -1,8 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../providers/product_provider.dart';
-import '../../services/api_service.dart';
-import '../../routes/app_routes.dart';
 
 class AddProductScreen extends StatefulWidget {
   const AddProductScreen({Key? key}) : super(key: key);
@@ -21,6 +21,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   bool _isPremium = false;
   bool _isAvailable = true;
   bool _isLoading = false;
+  final List<File> _imageFiles = [];
+  final ImagePicker _picker = ImagePicker();
 
   final List<String> _categories = ['FOOD', 'GROCERY', 'CRAFTS', 'MARKET'];
 
@@ -33,13 +35,90 @@ class _AddProductScreenState extends State<AddProductScreen> {
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      
+      if (image != null) {
+        setState(() {
+          _imageFiles.add(File(image.path));
+        });
+      }
+    } catch (e) {
+      print('Error picking image: $e');
+    }
+  }
+
+  Future<void> _takePhoto() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      
+      if (image != null) {
+        setState(() {
+          _imageFiles.add(File(image.path));
+        });
+      }
+    } catch (e) {
+      print('Error taking photo: $e');
+    }
+  }
+
+  void _removeImage(int index) {
+    setState(() {
+      if (index >= 0 && index < _imageFiles.length) {
+        _imageFiles.removeAt(index);
+      }
+    });
+  }
+
+  void _showImagePickerOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Gallery'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera),
+              title: const Text('Take Photo'),
+              onTap: () {
+                Navigator.pop(context);
+                _takePhoto();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasImages = _imageFiles.isNotEmpty;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add Product'),
         backgroundColor: Colors.white,
         elevation: 0,
+        foregroundColor: Colors.black,
         actions: [
           TextButton(
             onPressed: _isLoading ? null : _saveProduct,
@@ -60,6 +139,90 @@ class _AddProductScreenState extends State<AddProductScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Image Upload Section
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Product Images',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Image preview
+                    if (hasImages)
+                      SizedBox(
+                        height: 100,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _imageFiles.length,
+                          itemBuilder: (context, index) {
+                            return Stack(
+                              children: [
+                                Container(
+                                  width: 100,
+                                  height: 100,
+                                  margin: const EdgeInsets.only(right: 8),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    image: DecorationImage(
+                                      image: FileImage(_imageFiles[index]),
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 4,
+                                  right: 12,
+                                  child: GestureDetector(
+                                    onTap: () => _removeImage(index),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.close,
+                                        color: Colors.white,
+                                        size: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _showImagePickerOptions,
+                        icon: const Icon(Icons.add_photo_alternate),
+                        label: Text(
+                          hasImages ? 'Add More Images' : 'Add Product Images',
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
               // Product Name
               TextFormField(
                 controller: _nameController,
@@ -222,13 +385,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
     try {
       final productProvider = Provider.of<ProductProvider>(context, listen: false);
       
-      // Get category ID (1=FOOD, 2=GROCERY, 3=CRAFTS, 4=MARKET)
       final categoryMap = {
         'FOOD': 1,
         'GROCERY': 2,
         'CRAFTS': 3,
         'MARKET': 4,
       };
+
+      // Prepare image URLs (placeholder for now)
+      final List<String> imageUrls = _imageFiles.isNotEmpty 
+          ? ['https://picsum.photos/200/200?random=${DateTime.now().millisecondsSinceEpoch}'] 
+          : [];
 
       final productData = {
         'name': _nameController.text.trim(),
@@ -238,9 +405,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
         'stock_quantity': int.parse(_stockController.text.trim()),
         'is_available': _isAvailable,
         'is_premium': _isPremium,
+        'images': imageUrls,
       };
 
-      print('Sending product data: $productData');
+      print('📤 Sending product data: $productData');
 
       final success = await productProvider.createProduct(productData);
       
