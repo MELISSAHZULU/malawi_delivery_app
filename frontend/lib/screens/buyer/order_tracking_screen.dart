@@ -60,18 +60,24 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       }
       
       Order? foundOrder;
-      try {
-        foundOrder = orderProvider.orders.firstWhere(
-          (o) => o.id.toString() == widget.orderId || o.orderNumber == widget.orderId,
-        );
-      } catch (_) {
-        await orderProvider.trackOrder(widget.orderId);
-        foundOrder = orderProvider.currentOrder;
+      
+      if (widget.orderId.isEmpty) {
+        if (orderProvider.orders.isNotEmpty) {
+          foundOrder = orderProvider.orders.first;
+        }
+      } else {
+        try {
+          foundOrder = orderProvider.orders.firstWhere(
+            (o) => o.id.toString() == widget.orderId || o.orderNumber == widget.orderId,
+          );
+        } catch (_) {
+          await orderProvider.trackOrder(widget.orderId);
+          foundOrder = orderProvider.currentOrder;
+        }
       }
       
       if (foundOrder != null) {
-        // Now foundOrder is guaranteed to be non-null inside this block
-        final order = foundOrder; // This is now Order (non-nullable)
+        final order = foundOrder;
         setState(() {
           _order = order;
           _orderStatus = order.status;
@@ -79,7 +85,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           _updateETA(order);
         });
       } else {
-        setState(() => _error = 'Order not found');
+        setState(() => _error = 'No orders found');
       }
     } catch (e) {
       setState(() => _error = 'Failed to load order details');
@@ -138,6 +144,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         },
       );
     } catch (e) {
+      print('WebSocket connection failed, using polling');
       _startPolling();
     }
   }
@@ -320,6 +327,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildStatusAndDriverInfo(),
           const SizedBox(height: 16),
@@ -328,6 +336,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           _buildOrderSummary(),
           const SizedBox(height: 16),
           _buildDeliveryAddress(),
+          const SizedBox(height: 16),
         ],
       ),
     );
@@ -520,10 +529,15 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     ];
 
     int currentStep = 0;
-    if (_isDelivered) currentStep = 3;
-    else if (_isDriving) currentStep = 2;
-    else if (_isPreparing) currentStep = 1;
-    else if (_isPending) currentStep = 0;
+    if (_isDelivered) {
+      currentStep = 3;
+    } else if (_isDriving) {
+      currentStep = 2;
+    } else if (_isPreparing) {
+      currentStep = 1;
+    } else if (_isPending) {
+      currentStep = 0;
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -540,7 +554,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           ...steps.asMap().entries.map((entry) {
             final index = entry.key;
             final step = entry.value;
-            final isComplete = index <= currentStep;
+            final isComplete = index < currentStep;
             final isActive = index == currentStep;
 
             return Padding(
@@ -551,26 +565,62 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
                     width: 32,
                     height: 32,
                     decoration: BoxDecoration(
-                      color: isComplete ? (isActive ? const Color(0xFF2A7DE1) : Colors.green) : Colors.grey.shade200,
+                      color: isComplete 
+                          ? Colors.green 
+                          : (isActive ? const Color(0xFF2A7DE1) : Colors.grey.shade200),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(isComplete ? Icons.check : step['icon'] as IconData, size: 16, color: isComplete ? Colors.white : Colors.grey.shade600),
+                    child: Icon(
+                      isComplete ? Icons.check : step['icon'] as IconData,
+                      size: 16,
+                      color: (isComplete || isActive) ? Colors.white : Colors.grey.shade600,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(step['label'] as String, style: TextStyle(
-                          fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                          color: isComplete ? const Color(0xFF0A1A2B) : Colors.grey.shade600,
-                        )),
-                        if (isActive)
+                        Text(
+                          step['label'] as String,
+                          style: TextStyle(
+                            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                            color: (isComplete || isActive) ? const Color(0xFF0A1A2B) : Colors.grey.shade600,
+                          ),
+                        ),
+                        if (isActive && !_isDelivered)
                           Container(
                             margin: const EdgeInsets.only(top: 2),
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(4)),
-                            child: const Text('In progress...', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green)),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'In progress...',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF2A7DE1),
+                              ),
+                            ),
+                          ),
+                        if (isComplete && index == steps.length - 1)
+                          Container(
+                            margin: const EdgeInsets.only(top: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade50,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'Delivered! 🎉',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            ),
                           ),
                       ],
                     ),
@@ -594,6 +644,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           _buildDeliveryAddress(),
           const SizedBox(height: 16),
           _buildTimeline(),
+          const SizedBox(height: 16),
         ],
       ),
     );
@@ -688,6 +739,47 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   }
 
   Widget _buildErrorState() {
+    if (_error == 'No orders found') {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.inbox_outlined, size: 60, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            const Text(
+              'No Orders Yet',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0A1A2B),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Place your first order to track it here',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('Go Back'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0A1A2B),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -720,11 +812,24 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
         children: [
           Icon(Icons.shopping_bag_outlined, size: 60, color: Colors.grey.shade400),
           const SizedBox(height: 16),
-          const Text('No Active Orders', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
+          const Text(
+            'No Active Orders',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0A1A2B),
+            ),
+          ),
           const SizedBox(height: 8),
-          Text('You don\'t have any active orders to track', style: TextStyle(color: Colors.grey.shade600)),
+          Text(
+            'You don\'t have any active orders to track',
+            style: TextStyle(color: Colors.grey.shade600),
+          ),
           const SizedBox(height: 24),
-          ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Go Back')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Go Back'),
+          ),
         ],
       ),
     );
