@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/order_provider.dart';
+import '../../providers/product_provider.dart';
 import '../../models/user.dart';
 import '../../routes/app_routes.dart';
 
@@ -12,6 +14,71 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  bool _isLoading = true;
+  int _orderCount = 0;
+  int _productCount = 0;
+  double _rating = 0;
+  int _totalDeliveries = 0;
+  double _totalEarnings = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final orderProvider = Provider.of<OrderProvider>(context, listen: false);
+      final productProvider = Provider.of<ProductProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final user = authProvider.user;
+
+      // Fetch orders
+      await orderProvider.fetchOrders();
+      final orders = orderProvider.orders;
+
+      // Fetch products (if seller)
+      if (user?.isSeller == true) {
+        await productProvider.fetchSellerProducts();
+        _productCount = productProvider.products.length;
+      }
+
+      // Calculate stats based on user role
+      if (user != null) {
+        if (user.isBuyer) {
+          _orderCount = orders.length;
+        } else if (user.isSeller) {
+          _orderCount = orders.length;
+          _totalEarnings = orders
+              .where((o) => o.status == 'delivered' || o.status == 'completed')
+              .fold(0.0, (sum, order) => sum + (order.total ?? 0));
+          if (_orderCount > 0) {
+            _rating = 4.5; // This would come from backend
+          }
+        } else if (user.isDriver) {
+          _totalDeliveries = orders
+              .where((o) => o.status == 'delivered' || o.status == 'completed')
+              .length;
+          _totalEarnings = orders
+              .where((o) => o.status == 'delivered' || o.status == 'completed')
+              .fold(0.0, (sum, order) => sum + (order.deliveryFee ?? 0));
+          if (_totalDeliveries > 0) {
+            _rating = 4.8; // This would come from backend
+          }
+        }
+      }
+    } catch (e) {
+      print('Error loading profile data: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
@@ -44,43 +111,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
         foregroundColor: const Color(0xFF0A1A2B),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () {
-              // Navigate to settings
-            },
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadData,
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Profile header
-            _buildProfileHeader(user),
-            const SizedBox(height: 16),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  // Profile header
+                  _buildProfileHeader(user),
+                  const SizedBox(height: 16),
 
-            // Stats Cards - Role specific
-            _buildStatsCards(user),
-            const SizedBox(height: 16),
+                  // Stats Cards - Role specific with real data
+                  _buildStatsCards(user),
+                  const SizedBox(height: 16),
 
-            // Menu Items - Role specific
-            const Divider(),
-            _buildMenuItems(user, context),
-            const SizedBox(height: 16),
+                  // Menu Items - Role specific
+                  const Divider(),
+                  _buildMenuItems(user, context),
+                  const SizedBox(height: 16),
 
-            // App version
-            Center(
-              child: Text(
-                'MalaWiDash v1.0.0',
-                style: TextStyle(
-                  color: Colors.grey.shade400,
-                  fontSize: 12,
-                ),
+                  // App version
+                  Center(
+                    child: Text(
+                      'MalaWiDash v1.0.0',
+                      style: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -160,7 +227,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               fontSize: 14,
             ),
           ),
-          if (user.phoneNumber != null) ...[
+          if (user.phoneNumber != null && user.phoneNumber!.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
               user.phoneNumber!,
@@ -221,7 +288,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             fontSize: 14,
                           ),
                         ),
-                        if (user.location != null)
+                        if (user.location != null && user.location!.isNotEmpty)
                           Text(
                             user.location!,
                             style: TextStyle(
@@ -284,25 +351,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (user.isSeller) {
       return Row(
         children: [
-          _buildStatCard('Products', '12', Icons.inventory_2),
-          _buildStatCard('Orders', '156', Icons.shopping_bag),
-          _buildStatCard('Rating', '4.8 ★', Icons.star),
+          _buildStatCard('Products', '$_productCount', Icons.inventory_2),
+          _buildStatCard('Orders', '$_orderCount', Icons.shopping_bag),
+          _buildStatCard('Rating', '${_rating.toStringAsFixed(1)} ★', Icons.star),
         ],
       );
     } else if (user.isDriver) {
       return Row(
         children: [
-          _buildStatCard('Deliveries', '89', Icons.delivery_dining),
-          _buildStatCard('Rating', '4.9 ★', Icons.star),
-          _buildStatCard('Earnings', 'MWK 487K', Icons.attach_money),
+          _buildStatCard('Deliveries', '$_totalDeliveries', Icons.delivery_dining),
+          _buildStatCard('Rating', '${_rating.toStringAsFixed(1)} ★', Icons.star),
+          _buildStatCard('Earnings', 'MWK ${_totalEarnings.toStringAsFixed(0)}', Icons.attach_money),
         ],
       );
     } else if (user.isBuyer) {
       return Row(
         children: [
-          _buildStatCard('Orders', '23', Icons.shopping_bag),
-          _buildStatCard('Wishlist', '8', Icons.favorite),
-          _buildStatCard('Saved', '4', Icons.bookmark),
+          _buildStatCard('Orders', '$_orderCount', Icons.shopping_bag),
+          _buildStatCard('Wishlist', '0', Icons.favorite),
+          _buildStatCard('Saved', '0', Icons.bookmark),
         ],
       );
     }
