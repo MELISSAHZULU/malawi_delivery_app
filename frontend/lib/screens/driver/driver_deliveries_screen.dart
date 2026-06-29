@@ -48,19 +48,6 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            // Go back to the previous screen (driver dashboard)
-            // Use pop instead of pushReplacementNamed
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              // If can't pop, navigate to driver home
-              Navigator.pushReplacementNamed(context, AppRoutes.driverHome);
-            }
-          },
-        ),
         title: const Text('My Deliveries'),
         backgroundColor: Colors.white,
         elevation: 0,
@@ -90,23 +77,6 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                       Text(
                         'You\'ll see deliveries here when assigned',
                         style: TextStyle(color: Colors.grey.shade500),
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          if (Navigator.canPop(context)) {
-                            Navigator.pop(context);
-                          } else {
-                            Navigator.pushReplacementNamed(context, AppRoutes.driverHome);
-                          }
-                        },
-                        icon: const Icon(Icons.arrow_back),
-                        label: const Text('Go to Dashboard'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0A1A2B),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        ),
                       ),
                     ],
                   ),
