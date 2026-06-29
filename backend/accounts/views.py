@@ -1,6 +1,7 @@
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
@@ -12,22 +13,38 @@ User = get_user_model()
 
 
 class RegisterView(generics.CreateAPIView):
+    """
+    Register a new user with support for both JSON and multipart/form-data.
+    Supports image uploads for profile photos and identity documents.
+    """
     permission_classes = [AllowAny]
     serializer_class = RegisterSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     
     def post(self, request, *args, **kwargs):
+        # Handle both JSON and multipart data
+        # The parser classes handle the content type automatically
         serializer = self.get_serializer(data=request.data)
+        
         if serializer.is_valid():
             user = serializer.save()
             refresh = RefreshToken.for_user(user)
+            
+            # Prepare user data for response
+            user_data = UserSerializer(user).data
+            if user.role == 'seller' and hasattr(user, 'seller_profile'):
+                user_data['store_name'] = user.seller_profile.store_name
+                user_data['seller_address'] = user.seller_profile.address
+            
             return Response({
                 'success': True,
-                'user': UserSerializer(user).data,
+                'user': user_data,
                 'access': str(refresh.access_token),
                 'refresh': str(refresh),
                 'message': f'Account created successfully as {user.role}'
             }, status=status.HTTP_201_CREATED)
         
+        # Collect all error messages
         error_messages = []
         for field, errors in serializer.errors.items():
             for error in errors:
@@ -124,6 +141,7 @@ class ProfileView(generics.RetrieveUpdateAPIView):
 class UpdateStoreView(generics.UpdateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = SellerProfileSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     
     def get_object(self):
         return self.request.user.seller_profile

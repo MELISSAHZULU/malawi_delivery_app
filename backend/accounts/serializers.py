@@ -28,41 +28,35 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class SellerProfileSerializer(serializers.ModelSerializer):
-    # These fields will be handled manually in update
-    phone_number = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    location = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    seller_address = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    phone_number = serializers.CharField(source='user.phone_number', required=False, allow_blank=True)
+    location = serializers.CharField(source='user.location', required=False, allow_blank=True)
     
     class Meta:
         model = SellerProfile
         fields = [
             'store_name', 'store_description', 'address', 'delivery_fee', 
-            'phone_number', 'location', 'seller_address', 'is_active', 'opening_hours'
+            'phone_number', 'location', 'is_active', 'opening_hours',
+            'national_id', 'national_id_image', 'profile_photo', 
+            'business_license', 'is_identity_verified', 'is_approved'
         ]
-        read_only_fields = ['is_active']
+        read_only_fields = ['is_identity_verified', 'is_approved']
     
     def update(self, instance, validated_data):
-        # Extract user-related fields
-        phone_number = validated_data.pop('phone_number', None)
-        location = validated_data.pop('location', None)
-        seller_address = validated_data.pop('seller_address', None)
+        user_data = {}
+        if 'phone_number' in validated_data:
+            user_data['phone_number'] = validated_data.pop('phone_number')
+        if 'location' in validated_data:
+            user_data['location'] = validated_data.pop('location')
         
-        # Update seller profile fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
         
-        # Update user fields
-        user = instance.user  # Get the User instance
-        if phone_number is not None:
-            user.phone_number = phone_number
-        if location is not None:
-            user.location = location
-        if seller_address is not None:
-            # Store seller address in the seller profile address field
-            instance.address = seller_address
-            instance.save()
-        user.save()
+        if user_data:
+            user = instance.user
+            for attr, value in user_data.items():
+                setattr(user, attr, value)
+            user.save()
         
         return instance
 
@@ -73,9 +67,25 @@ class RegisterSerializer(serializers.ModelSerializer):
     store_name = serializers.CharField(required=False, allow_blank=True)
     address = serializers.CharField(required=False, allow_blank=True)
     
+    # ✅ FIXED: Use CharField instead of ImageField for web compatibility
+    profile_photo = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    national_id_image = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    license_image = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    
+    # Driver fields
+    vehicle_type = serializers.CharField(required=False, allow_blank=True)
+    vehicle_plate = serializers.CharField(required=False, allow_blank=True)
+    vehicle_color = serializers.CharField(required=False, allow_blank=True)
+    vehicle_model = serializers.CharField(required=False, allow_blank=True)
+    
     class Meta:
         model = User
-        fields = ['username', 'email', 'password', 'password2', 'role', 'phone_number', 'store_name', 'address']
+        fields = [
+            'username', 'email', 'password', 'password2', 'role', 'phone_number',
+            'store_name', 'address',
+            'profile_photo', 'national_id_image', 'license_image',
+            'vehicle_type', 'vehicle_plate', 'vehicle_color', 'vehicle_model'
+        ]
     
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
@@ -99,32 +109,57 @@ class RegisterSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         validated_data.pop('password2')
+        
         store_name = validated_data.pop('store_name', '')
         address = validated_data.pop('address', '')
+        
+        # ✅ Get URL strings
+        profile_photo = validated_data.pop('profile_photo', '')
+        national_id_image = validated_data.pop('national_id_image', '')
+        license_image = validated_data.pop('license_image', '')
+        
+        vehicle_type = validated_data.pop('vehicle_type', '')
+        vehicle_plate = validated_data.pop('vehicle_plate', '')
+        vehicle_color = validated_data.pop('vehicle_color', '')
+        vehicle_model = validated_data.pop('vehicle_model', '')
         
         user = User.objects.create_user(**validated_data)
         
         if user.role == 'buyer':
             BuyerProfile.objects.create(user=user)
+            
         elif user.role == 'seller':
             seller = SellerProfile.objects.create(
                 user=user,
                 store_name=store_name or f"{user.username}'s Store",
                 address=address or '',
                 latitude=0,
-                longitude=0
+                longitude=0,
+                # ✅ Store URLs in the fields
+                profile_photo=profile_photo if profile_photo else None,
+                national_id_image=national_id_image if national_id_image else None,
+                is_identity_verified=False,
+                is_approved=False
             )
-            # Create wallet for seller
             try:
                 from payments.models import SellerWallet
                 SellerWallet.objects.get_or_create(seller=seller)
             except:
                 pass
+                
         elif user.role == 'driver':
-            DriverProfile.objects.create(
+            driver = DriverProfile.objects.create(
                 user=user,
-                vehicle_type='motorcycle',
-                vehicle_plate=''
+                vehicle_type=vehicle_type or 'motorcycle',
+                vehicle_plate=vehicle_plate,
+                vehicle_color=vehicle_color,
+                vehicle_model=vehicle_model,
+                # ✅ Store URLs in the fields
+                profile_photo=profile_photo if profile_photo else None,
+                national_id_image=national_id_image if national_id_image else None,
+                driver_license=license_image if license_image else None,
+                is_identity_verified=False,
+                is_verified=False
             )
         
         return user

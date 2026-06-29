@@ -1,5 +1,3 @@
-# backend/accounts/models.py
-
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
@@ -49,6 +47,13 @@ class SellerProfile(models.Model):
     delivery_fee = models.DecimalField(max_digits=10, decimal_places=2, default=1500)
     is_approved = models.BooleanField(default=False)
     
+    # ✅ Changed to CharField for URL compatibility (web + mobile)
+    national_id = models.CharField(max_length=20, blank=True, null=True)
+    national_id_image = models.CharField(max_length=500, blank=True, null=True)  # URL
+    profile_photo = models.CharField(max_length=500, blank=True, null=True)  # URL
+    business_license = models.CharField(max_length=500, blank=True, null=True)  # URL
+    is_identity_verified = models.BooleanField(default=False)
+    
     def __str__(self):
         return self.store_name
 
@@ -58,13 +63,25 @@ class DriverProfile(models.Model):
         ('motorcycle', 'Motorcycle'),
         ('bicycle', 'Bicycle'),
         ('car', 'Car'),
+        ('van', 'Van'),
+        ('truck', 'Truck'),
     )
     
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='driver_profile')
     vehicle_type = models.CharField(max_length=50, choices=VEHICLE_CHOICES, default='motorcycle')
     vehicle_plate = models.CharField(max_length=20, blank=True)
+    vehicle_color = models.CharField(max_length=50, blank=True)
+    vehicle_model = models.CharField(max_length=100, blank=True)
     vehicle_image = models.ImageField(upload_to='vehicles/', null=True, blank=True)
     license_image = models.ImageField(upload_to='licenses/', null=True, blank=True)
+    
+    # ✅ Changed to CharField for URL compatibility (web + mobile)
+    national_id = models.CharField(max_length=20, blank=True, null=True)
+    national_id_image = models.CharField(max_length=500, blank=True, null=True)  # URL
+    profile_photo = models.CharField(max_length=500, blank=True, null=True)  # URL
+    driver_license = models.CharField(max_length=500, blank=True, null=True)  # URL
+    is_identity_verified = models.BooleanField(default=False)
+    
     is_available = models.BooleanField(default=True)
     is_verified = models.BooleanField(default=False)
     rating = models.FloatField(default=0)
