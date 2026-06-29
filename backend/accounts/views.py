@@ -32,9 +32,22 @@ class RegisterView(generics.CreateAPIView):
             
             # Prepare user data for response
             user_data = UserSerializer(user).data
+            
+            # Add role-specific data
             if user.role == 'seller' and hasattr(user, 'seller_profile'):
                 user_data['store_name'] = user.seller_profile.store_name
                 user_data['seller_address'] = user.seller_profile.address
+            elif user.role == 'driver' and hasattr(user, 'driver_profile'):
+                driver = user.driver_profile
+                user_data['vehicle_type'] = driver.vehicle_type
+                user_data['vehicle_plate'] = driver.vehicle_plate
+                user_data['vehicle_color'] = driver.vehicle_color
+                user_data['vehicle_model'] = driver.vehicle_model
+                user_data['vehicle_image'] = driver.vehicle_image.url if driver.vehicle_image else None
+                user_data['national_id'] = driver.national_id
+                user_data['national_id_image'] = driver.national_id_image
+                user_data['driver_license'] = driver.driver_license
+                user_data['profile_photo'] = driver.profile_photo
             
             return Response({
                 'success': True,
@@ -102,9 +115,22 @@ class LoginView(TokenObtainPairView):
         refresh = RefreshToken.for_user(user)
         
         user_data = UserSerializer(user).data
+        
+        # Add role-specific data
         if user.role == 'seller' and hasattr(user, 'seller_profile'):
             user_data['store_name'] = user.seller_profile.store_name
             user_data['seller_address'] = user.seller_profile.address
+        elif user.role == 'driver' and hasattr(user, 'driver_profile'):
+            driver = user.driver_profile
+            user_data['vehicle_type'] = driver.vehicle_type
+            user_data['vehicle_plate'] = driver.vehicle_plate
+            user_data['vehicle_color'] = driver.vehicle_color
+            user_data['vehicle_model'] = driver.vehicle_model
+            user_data['vehicle_image'] = driver.vehicle_image.url if driver.vehicle_image else None
+            user_data['national_id'] = driver.national_id
+            user_data['national_id_image'] = driver.national_id_image
+            user_data['driver_license'] = driver.driver_license
+            user_data['profile_photo'] = driver.profile_photo
         
         print(f"Login successful for {username}, Role: {user.role}")
         
@@ -118,6 +144,10 @@ class LoginView(TokenObtainPairView):
 
 
 class ProfileView(generics.RetrieveUpdateAPIView):
+    """
+    Get or update the current user's profile.
+    Returns role-specific data for drivers and sellers.
+    """
     permission_classes = [IsAuthenticated]
     serializer_class = ProfileSerializer
     
@@ -128,9 +158,32 @@ class ProfileView(generics.RetrieveUpdateAPIView):
         user = self.get_object()
         data = ProfileSerializer(user).data
         
+        # ✅ Add driver-specific data
+        if user.role == 'driver' and hasattr(user, 'driver_profile'):
+            driver = user.driver_profile
+            data['vehicle_type'] = driver.vehicle_type
+            data['vehicle_plate'] = driver.vehicle_plate
+            data['vehicle_color'] = driver.vehicle_color
+            data['vehicle_model'] = driver.vehicle_model
+            data['vehicle_image'] = driver.vehicle_image.url if driver.vehicle_image else None
+            data['national_id'] = driver.national_id
+            data['national_id_image'] = driver.national_id_image
+            data['driver_license'] = driver.driver_license
+            data['profile_photo'] = driver.profile_photo
+            data['is_identity_verified'] = driver.is_identity_verified
+            data['is_verified'] = driver.is_verified
+        
+        # ✅ Add seller-specific data
         if user.role == 'seller' and hasattr(user, 'seller_profile'):
-            data['store_name'] = user.seller_profile.store_name
-            data['seller_address'] = user.seller_profile.address
+            seller = user.seller_profile
+            data['store_name'] = seller.store_name
+            data['seller_address'] = seller.address
+            data['national_id'] = seller.national_id
+            data['national_id_image'] = seller.national_id_image
+            data['profile_photo'] = seller.profile_photo
+            data['business_license'] = seller.business_license
+            data['is_identity_verified'] = seller.is_identity_verified
+            data['is_approved'] = seller.is_approved
         
         return Response({
             'success': True,
@@ -155,13 +208,126 @@ class UpdateStoreView(generics.UpdateAPIView):
         
         user = self.request.user
         user_data = UserSerializer(user).data
+        
+        # Add seller data to response
         if hasattr(user, 'seller_profile'):
-            user_data['store_name'] = user.seller_profile.store_name
-            user_data['seller_address'] = user.seller_profile.address
+            seller = user.seller_profile
+            user_data['store_name'] = seller.store_name
+            user_data['seller_address'] = seller.address
         
         return Response({
             'success': True,
             'data': serializer.data,
             'user': user_data,
             'message': 'Store updated successfully'
+        })
+
+class UpdateDriverProfileView(generics.UpdateAPIView):
+    """
+    Update driver profile information including vehicle details.
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    
+    def get_object(self):
+        return self.request.user.driver_profile
+    
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        
+        # Update only the fields that are provided
+        if 'vehicle_type' in request.data:
+            instance.vehicle_type = request.data['vehicle_type']
+        if 'vehicle_plate' in request.data:
+            instance.vehicle_plate = request.data['vehicle_plate']
+        if 'vehicle_color' in request.data:
+            instance.vehicle_color = request.data['vehicle_color']
+        if 'vehicle_model' in request.data:
+            instance.vehicle_model = request.data['vehicle_model']
+        
+        instance.save()
+        
+        # Get updated user data
+        user = self.request.user
+        user_data = UserSerializer(user).data
+        
+        # Add driver data to response
+        if hasattr(user, 'driver_profile'):
+            driver = user.driver_profile
+            user_data['vehicle_type'] = driver.vehicle_type
+            user_data['vehicle_plate'] = driver.vehicle_plate
+            user_data['vehicle_color'] = driver.vehicle_color
+            user_data['vehicle_model'] = driver.vehicle_model
+            user_data['vehicle_image'] = driver.vehicle_image.url if driver.vehicle_image else None
+            user_data['national_id'] = driver.national_id
+            user_data['national_id_image'] = driver.national_id_image
+            user_data['driver_license'] = driver.driver_license
+            user_data['profile_photo'] = driver.profile_photo
+        
+        return Response({
+            'success': True,
+            'data': {
+                'vehicle_type': instance.vehicle_type,
+                'vehicle_plate': instance.vehicle_plate,
+                'vehicle_color': instance.vehicle_color,
+                'vehicle_model': instance.vehicle_model,
+            },
+            'user': user_data,
+            'message': 'Driver profile updated successfully'
+        })
+
+class UpdateDriverProfileView(generics.UpdateAPIView):
+    """
+    Update driver profile information including vehicle details.
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    
+    def get_object(self):
+        return self.request.user.driver_profile
+    
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        
+        # Update only the fields that are provided
+        if 'vehicle_type' in request.data:
+            instance.vehicle_type = request.data['vehicle_type']
+        if 'vehicle_plate' in request.data:
+            instance.vehicle_plate = request.data['vehicle_plate']
+        if 'vehicle_color' in request.data:
+            instance.vehicle_color = request.data['vehicle_color']
+        if 'vehicle_model' in request.data:
+            instance.vehicle_model = request.data['vehicle_model']
+        
+        instance.save()
+        
+        # Get updated user data
+        user = self.request.user
+        user_data = UserSerializer(user).data
+        
+        # Add driver data to response
+        if hasattr(user, 'driver_profile'):
+            driver = user.driver_profile
+            user_data['vehicle_type'] = driver.vehicle_type
+            user_data['vehicle_plate'] = driver.vehicle_plate
+            user_data['vehicle_color'] = driver.vehicle_color
+            user_data['vehicle_model'] = driver.vehicle_model
+            user_data['vehicle_image'] = driver.vehicle_image.url if driver.vehicle_image else None
+            user_data['national_id'] = driver.national_id
+            user_data['national_id_image'] = driver.national_id_image
+            user_data['driver_license'] = driver.driver_license
+            user_data['profile_photo'] = driver.profile_photo
+        
+        return Response({
+            'success': True,
+            'data': {
+                'vehicle_type': instance.vehicle_type,
+                'vehicle_plate': instance.vehicle_plate,
+                'vehicle_color': instance.vehicle_color,
+                'vehicle_model': instance.vehicle_model,
+            },
+            'user': user_data,
+            'message': 'Driver profile updated successfully'
         })

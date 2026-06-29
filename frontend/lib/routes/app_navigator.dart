@@ -21,11 +21,14 @@ import '../screens/driver/driver_dashboard.dart';
 import '../screens/driver/driver_profile_screen.dart';
 import '../screens/driver/driver_deliveries_screen.dart';
 import '../screens/driver/delivery_detail_screen.dart';
+import '../screens/driver/edit_vehicle_screen.dart';
 import '../screens/shared/notifications_screen.dart';
 import '../screens/shared/help_support_screen.dart';
 import '../screens/shared/saved_addresses_screen.dart';
 import '../screens/shared/payment_methods_screen.dart';
 import '../screens/shared/profile_screen.dart';
+import '../screens/driver/edit_vehicle_screen.dart';
+
 
 class AppNavigator {
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -120,9 +123,12 @@ class AppNavigator {
           builder: (_) => OrderTrackingScreen(orderId: orderId),
         );
 
+      case AppRoutes.editVehicle:
+        return MaterialPageRoute(builder: (_) => const EditVehicleScreen());
+
+
       // ==================== SHARED SCREENS ====================
       case AppRoutes.profile:
-        // This is the shared profile - used by buyers
         return MaterialPageRoute(builder: (_) => const ProfileScreen());
       
       case AppRoutes.orders:

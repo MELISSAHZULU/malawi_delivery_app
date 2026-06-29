@@ -48,6 +48,7 @@ class _SplashScreenState extends State<SplashScreen> {
         print('🚚 Navigating to Driver Dashboard');
       } else {
         route = AppRoutes.buyerHome;
+        print('⚠️ Unknown role, defaulting to Buyer Home');
       }
     } else {
       route = AppRoutes.login;

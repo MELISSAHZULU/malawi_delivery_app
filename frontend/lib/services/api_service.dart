@@ -183,6 +183,44 @@ class ApiService {
     }
   }
 
+  // ✅ NEW: Update Driver Profile
+  Future<Map<String, dynamic>> updateDriverProfile(Map<String, dynamic> data) async {
+    try {
+      final token = await _storage.read(key: 'access_token');
+      
+      if (token == null) {
+        return {'success': false, 'error': 'Not authenticated'};
+      }
+      
+      final response = await http.put(
+        Uri.parse('$baseUrl/auth/update-driver-profile/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode(data),
+      );
+
+      print('Update driver profile status: ${response.statusCode}');
+      print('Update driver profile body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        return {
+          'success': true,
+          'data': responseData['data'],
+          'user': responseData['user'],
+          'message': responseData['message'] ?? 'Driver profile updated'
+        };
+      }
+      return {'success': false, 'error': 'Failed to update driver profile'};
+    } catch (e) {
+      print('Update driver profile error: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
   // ============ PRODUCTS ============
   Future<Map<String, dynamic>> getProducts() async {
     try {
@@ -515,8 +553,7 @@ class ApiService {
       print('Get notifications body: ${response.body}');
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return {'success': true, 'data': data};
+        return {'success': true, 'data': json.decode(response.body)};
       }
       return {'success': false, 'error': 'Failed to fetch notifications'};
     } catch (e) {
@@ -731,15 +768,12 @@ class ApiService {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         
-        // Handle both plain list and wrapped response
         if (data is List) {
           return {'success': true, 'data': data};
         } else if (data is Map<String, dynamic>) {
-          // If it's already a map with success, return it
           if (data.containsKey('success')) {
             return data;
           }
-          // Otherwise wrap it
           return {'success': true, 'data': data};
         } else {
           return {'success': true, 'data': data};

@@ -1,10 +1,10 @@
-// lib/routes/app_routes.dart
-
 class AppRoutes {
+  // Auth
   static const String splash = '/';
   static const String login = '/login';
   static const String register = '/register';
   
+  // Buyer
   static const String buyerHome = '/buyer-home';
   static const String sellerHome = '/seller-home';
   static const String driverHome = '/driver-home';
@@ -16,18 +16,21 @@ class AppRoutes {
   static const String orderHistory = '/order-history';
   static const String buyerProfile = '/buyer-profile';
   
+  // Driver
   static const String deliveries = '/deliveries';
   static const String deliveryDetail = '/delivery-detail';
   static const String driverProfile = '/driver-profile';
   static const String driverTracking = '/driver-tracking';
+  static const String editVehicle = '/edit-vehicle';
   
+  // Shared
   static const String profile = '/profile';
   static const String orders = '/orders';
   static const String addProduct = '/add-product';
   static const String editProduct = '/edit-product';
   static const String editShopProfile = '/edit-shop-profile';
   
-  // NEW ROUTES
+  // New routes for seller
   static const String manageProducts = '/manage-products';
   static const String storeSettings = '/store-settings';
   static const String salesAnalytics = '/sales-analytics';

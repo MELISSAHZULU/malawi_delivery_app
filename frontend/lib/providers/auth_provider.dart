@@ -38,6 +38,12 @@ class AuthProvider extends ChangeNotifier {
         _token = response['access'];
         _isLoading = false;
         notifyListeners();
+        
+        print('✅ User logged in: ${_user?.username}, Role: ${_user?.role}');
+        if (_user?.isDriver == true) {
+          print('🚗 Vehicle: ${_user?.vehicleType} - ${_user?.vehiclePlate}');
+        }
+        
         return true;
       } else {
         _error = response['error'] ?? 'Login failed';
@@ -67,6 +73,7 @@ class AuthProvider extends ChangeNotifier {
         _token = response['access'];
         _isLoading = false;
         notifyListeners();
+        print('✅ User registered: ${_user?.username}, Role: ${_user?.role}');
         return true;
       } else {
         _error = response['error'] ?? 'Registration failed';
@@ -86,14 +93,22 @@ class AuthProvider extends ChangeNotifier {
     try {
       final response = await _apiService.getCurrentUser();
       print('Load user response: $response');
+      
       if (response['success'] == true) {
         _user = User.fromJson(response['data']);
         notifyListeners();
-        print('User loaded: ${_user?.username}, Role: ${_user?.role}');
-        if (_user?.isSeller == true) {
-          print('Seller address: ${_user?.sellerAddress}');
-          print('Store name: ${_user?.storeName}');
+        print('✅ User loaded: ${_user?.username}, Role: ${_user?.role}');
+        
+        if (_user?.isDriver == true) {
+          print('🚗 Vehicle: ${_user?.vehicleType} - ${_user?.vehiclePlate}');
+          print('🆔 National ID: ${_user?.nationalId}');
         }
+        if (_user?.isSeller == true) {
+          print('🏪 Store: ${_user?.storeName}');
+          print('📍 Address: ${_user?.sellerAddress}');
+        }
+      } else {
+        print('❌ Failed to load user: ${response['error']}');
       }
     } catch (e) {
       print('Error loading user: $e');

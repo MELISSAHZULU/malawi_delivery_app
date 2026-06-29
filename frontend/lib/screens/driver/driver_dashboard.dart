@@ -51,7 +51,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
-              // Refresh all data
               final driverProvider = Provider.of<DriverProvider>(context, listen: false);
               driverProvider.fetchAssignedOrders();
             },

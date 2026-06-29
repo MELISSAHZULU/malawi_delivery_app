@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/driver_provider.dart';
-import '../../providers/order_provider.dart';
+import '../../models/user.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/formatters.dart';
+import 'edit_vehicle_screen.dart';
 
 class DriverProfileScreen extends StatefulWidget {
   const DriverProfileScreen({Key? key}) : super(key: key);
@@ -38,15 +39,25 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
         .where((o) => o.isDelivered)
         .fold(0.0, (sum, o) => sum + o.deliveryFee);
 
+    // Get real driver data from user
+    final String driverName = user?.username ?? 'Driver';
+    final String driverEmail = user?.email ?? 'No email';
+    final String driverPhone = user?.phoneNumber ?? 'Not provided';
+    final String? profilePhotoUrl = user?.profilePhoto ?? user?.profilePicture;
+    
+    // Driver fields
+    final String vehicleType = user?.vehicleType ?? 'Motorcycle';
+    final String vehiclePlate = user?.vehiclePlate ?? 'Not specified';
+    final String vehicleColor = user?.vehicleColor ?? 'Not specified';
+    final String vehicleModel = user?.vehicleModel ?? 'Not specified';
+    final String? vehicleImage = user?.vehicleImage;
+    final String? nationalId = user?.nationalId;
+    final String? nationalIdImage = user?.nationalIdImage;
+    final String? driverLicense = user?.driverLicense;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
         title: const Text('Driver Profile'),
         backgroundColor: Colors.white,
         elevation: 0,
@@ -77,18 +88,35 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               ),
               child: Column(
                 children: [
+                  // Profile Photo or Initial
                   CircleAvatar(
                     radius: 50,
                     backgroundColor: Colors.orange.shade100,
-                    child: Icon(
-                      Icons.delivery_dining,
-                      size: 50,
-                      color: Colors.orange.shade700,
-                    ),
+                    child: profilePhotoUrl != null && profilePhotoUrl.isNotEmpty
+                        ? ClipOval(
+                            child: Image.network(
+                              profilePhotoUrl,
+                              width: 100,
+                              height: 100,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(
+                                  Icons.delivery_dining,
+                                  size: 50,
+                                  color: Colors.orange.shade700,
+                                );
+                              },
+                            ),
+                          )
+                        : Icon(
+                            Icons.delivery_dining,
+                            size: 50,
+                            color: Colors.orange.shade700,
+                          ),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    user?.username ?? 'Driver',
+                    driverName,
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -97,16 +125,16 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    user?.email ?? 'No email',
+                    driverEmail,
                     style: TextStyle(
                       color: Colors.grey.shade600,
                       fontSize: 14,
                     ),
                   ),
-                  if (user?.phoneNumber != null && user!.phoneNumber!.isNotEmpty) ...[
+                  if (driverPhone.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
-                      user!.phoneNumber!,
+                      driverPhone,
                       style: TextStyle(
                         color: Colors.grey.shade600,
                         fontSize: 14,
@@ -254,7 +282,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Vehicle Information
+            // Vehicle Information with Edit Button
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -270,25 +298,117 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Vehicle Information',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0A1A2B),
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Vehicle Information',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0A1A2B),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const EditVehicleScreen(),
+                            ),
+                          ).then((_) => _loadData());
+                        },
+                        icon: const Icon(Icons.edit, size: 16, color: Color(0xFF2A7DE1)),
+                        label: const Text(
+                          'Edit',
+                          style: TextStyle(color: Color(0xFF2A7DE1)),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
-                  _buildInfoRow('Vehicle Type', 'Motorcycle'),
-                  _buildInfoRow('Plate Number', 'MW 1234 A'),
-                  _buildInfoRow('Model', 'Yamaha YBR 125'),
-                  _buildInfoRow('Insurance', 'Valid until Dec 2025'),
+                  _buildInfoRow('Vehicle Type', vehicleType),
+                  _buildInfoRow('Plate Number', vehiclePlate),
+                  _buildInfoRow('Vehicle Color', vehicleColor),
+                  _buildInfoRow('Vehicle Model', vehicleModel),
+                  if (vehicleImage != null && vehicleImage.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(top: 8),
+                      height: 100,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        image: DecorationImage(
+                          image: NetworkImage(vehicleImage),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
 
-            // Menu Items - Driver Specific
+            // Identity Documents (if available)
+            if (nationalId != null && nationalId.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.05),
+                      blurRadius: 10,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Identity Documents',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0A1A2B),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildInfoRow('National ID', nationalId),
+                    if (nationalIdImage != null && nationalIdImage.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.only(top: 8),
+                        height: 100,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          image: DecorationImage(
+                            image: NetworkImage(nationalIdImage),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    if (driverLicense != null && driverLicense.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.only(top: 8),
+                        height: 100,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          image: DecorationImage(
+                            image: NetworkImage(driverLicense),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+            const SizedBox(height: 16),
+
+            // Menu Items
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
