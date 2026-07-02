@@ -1,7 +1,7 @@
 from rest_framework import generics, status
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.views import APIView  # ✅ ADD THIS IMPORT
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -57,89 +57,35 @@ class DriverLocationView(generics.RetrieveUpdateAPIView):
             driver=self.request.user
         )
         return location
-    
-    def update(self, request, *args, **kwargs):
-        """Update location with additional logic"""
-        partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
-        
-        # Update location
-        self.perform_update(serializer)
-        
-        # Log activity
-        DriverActivityLog.objects.create(
-            driver=request.user,
-            action='online' if serializer.validated_data.get('is_active', True) else 'offline',
-            latitude=serializer.validated_data.get('latitude'),
-            longitude=serializer.validated_data.get('longitude')
-        )
-        
-        # Check if driver has active delivery
-        active_assignment = DeliveryAssignment.objects.filter(
-            driver=request.user,
-            status__in=['picked_up', 'driving']
-        ).first()
-        
-        if active_assignment:
-            # Calculate ETA to customer
-            eta = calculate_eta(
-                float(serializer.validated_data.get('latitude', 0)),
-                float(serializer.validated_data.get('longitude', 0)),
-                float(active_assignment.order.delivery_latitude) if active_assignment.order.delivery_latitude else None,
-                float(active_assignment.order.delivery_longitude) if active_assignment.order.delivery_longitude else None
-            )
-            
-            # Broadcast to customer via WebSocket
-            try:
-                from .consumers import notify_customer
-                notify_customer(active_assignment.order.buyer.user.id, {
-                    'type': 'driver_location',
-                    'latitude': float(serializer.validated_data.get('latitude', 0)),
-                    'longitude': float(serializer.validated_data.get('longitude', 0)),
-                    'eta': eta,
-                    'driver_name': request.user.username,
-                    'driver_phone': request.user.phone_number,
-                })
-            except:
-                pass
-        
-        return Response({
-            'success': True,
-            'message': 'Location updated successfully',
-            'data': serializer.data
-        })
 
 
 class AvailableDriversView(APIView):
-    """Get list of available drivers with their locations"""
+    """Get list of available drivers"""
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        # Get online drivers
-        online_drivers = DriverLocation.objects.filter(is_active=True)
+        available_drivers = DriverProfile.objects.filter(
+            is_available=True,
+            is_verified=True,
+            user__is_active=True
+        )
         
         drivers_data = []
-        for location in online_drivers:
-            try:
-                profile = DriverProfile.objects.get(user=location.driver)
-                drivers_data.append({
-                    'id': profile.id,
-                    'user_id': location.driver.id,
-                    'username': location.driver.username,
-                    'phone_number': location.driver.phone_number,
-                    'vehicle_type': profile.vehicle_type,
-                    'vehicle_plate': profile.vehicle_plate,
-                    'rating': float(profile.rating) if profile.rating else 0,
-                    'location': {
-                        'latitude': float(location.latitude),
-                        'longitude': float(location.longitude),
-                    },
-                    'last_updated': location.last_updated.isoformat()
-                })
-            except DriverProfile.DoesNotExist:
-                continue
+        for driver in available_drivers:
+            location = DriverLocation.objects.filter(driver=driver.user).first()
+            drivers_data.append({
+                'id': driver.id,
+                'user_id': driver.user.id,
+                'username': driver.user.username,
+                'phone_number': driver.user.phone_number,
+                'vehicle_type': driver.vehicle_type,
+                'vehicle_plate': driver.vehicle_plate,
+                'rating': driver.rating,
+                'location': {
+                    'latitude': float(location.latitude) if location else 0,
+                    'longitude': float(location.longitude) if location else 0,
+                } if location else None
+            })
         
         return Response(drivers_data)
 
@@ -290,7 +236,7 @@ class UpdateDeliveryStatusView(APIView):
     
     def post(self, request, *args, **kwargs):
         order_id = kwargs.get('order_id')
-        action = request.data.get('action')  # 'pick_up', 'deliver', 'driving'
+        action = request.data.get('action')  # 'pick_up', 'deliver'
         
         if not action:
             return Response(
@@ -321,28 +267,7 @@ class UpdateDeliveryStatusView(APIView):
             order.save()
             assignment.status = 'driving'
             assignment.picked_up_at = timezone.now()
-            
-            # Calculate distance to customer
-            if order.delivery_latitude and order.delivery_longitude:
-                driver_location = DriverLocation.objects.filter(driver=request.user).first()
-                if driver_location:
-                    try:
-                        distance = geodesic(
-                            (float(driver_location.latitude), float(driver_location.longitude)),
-                            (float(order.delivery_latitude), float(order.delivery_longitude))
-                        ).km
-                        assignment.distance_to_customer = round(distance, 2)
-                    except:
-                        pass
-            
             assignment.save()
-            
-            # Log activity
-            DriverActivityLog.objects.create(
-                driver=request.user,
-                action='pickup',
-                order=order
-            )
             
             # Notify buyer
             Notification.objects.create(
@@ -362,22 +287,7 @@ class UpdateDeliveryStatusView(APIView):
                 data={'order_id': order.id, 'order_number': order.order_number}
             )
             
-            # Notify buyer via WebSocket
-            try:
-                from .consumers import notify_customer
-                notify_customer(order.buyer.user.id, {
-                    'type': 'status_update',
-                    'status': 'driving',
-                    'order_id': order.id
-                })
-            except:
-                pass
-            
-            return Response({
-                'success': True, 
-                'status': 'driving',
-                'assignment': DeliveryAssignmentSerializer(assignment).data
-            })
+            return Response({'success': True, 'status': 'driving'})
             
         elif action == 'deliver':
             if order.status != 'driving':
@@ -391,13 +301,6 @@ class UpdateDeliveryStatusView(APIView):
             assignment.status = 'delivered'
             assignment.delivered_at = timezone.now()
             assignment.save()
-            
-            # Log activity
-            DriverActivityLog.objects.create(
-                driver=request.user,
-                action='deliver',
-                order=order
-            )
             
             # Notify buyer
             Notification.objects.create(
@@ -417,34 +320,7 @@ class UpdateDeliveryStatusView(APIView):
                 data={'order_id': order.id, 'order_number': order.order_number}
             )
             
-            # Notify buyer via WebSocket
-            try:
-                from .consumers import notify_customer
-                notify_customer(order.buyer.user.id, {
-                    'type': 'status_update',
-                    'status': 'delivered',
-                    'order_id': order.id
-                })
-            except:
-                pass
-            
-            return Response({
-                'success': True, 
-                'status': 'delivered',
-                'assignment': DeliveryAssignmentSerializer(assignment).data
-            })
-            
-        elif action == 'driving':
-            # Just update status to driving
-            order.status = 'driving'
-            order.save()
-            assignment.status = 'driving'
-            assignment.save()
-            
-            return Response({
-                'success': True,
-                'status': 'driving'
-            })
+            return Response({'success': True, 'status': 'delivered'})
             
         else:
             return Response(
@@ -516,6 +392,7 @@ class AvailableOrdersForDriverView(APIView):
         # Sort by distance (closest first)
         result.sort(key=lambda x: x['distance'] if x['distance'] is not None else 999999)
         
+        # Return as list (not wrapped)
         return Response(result)
 
 

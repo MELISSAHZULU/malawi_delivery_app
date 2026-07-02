@@ -183,7 +183,6 @@ class ApiService {
     }
   }
 
-  // ✅ NEW: Update Driver Profile
   Future<Map<String, dynamic>> updateDriverProfile(Map<String, dynamic> data) async {
     try {
       final token = await _storage.read(key: 'access_token');
@@ -553,7 +552,8 @@ class ApiService {
       print('Get notifications body: ${response.body}');
 
       if (response.statusCode == 200) {
-        return {'success': true, 'data': json.decode(response.body)};
+        final data = json.decode(response.body);
+        return {'success': true, 'data': data};
       }
       return {'success': false, 'error': 'Failed to fetch notifications'};
     } catch (e) {
@@ -746,7 +746,8 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> getAvailableOrders() async {
+  // ✅ FIXED: Return type changed to dynamic
+  Future<dynamic> getAvailableOrders() async {
     try {
       final token = await _storage.read(key: 'access_token');
       if (token == null) {
@@ -767,17 +768,8 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
-        if (data is List) {
-          return {'success': true, 'data': data};
-        } else if (data is Map<String, dynamic>) {
-          if (data.containsKey('success')) {
-            return data;
-          }
-          return {'success': true, 'data': data};
-        } else {
-          return {'success': true, 'data': data};
-        }
+        // Return raw decoded JSON (could be List or Map)
+        return data;
       }
       return {'success': false, 'error': 'Failed to fetch available orders'};
     } catch (e) {

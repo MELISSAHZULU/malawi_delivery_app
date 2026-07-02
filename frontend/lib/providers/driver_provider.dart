@@ -86,37 +86,57 @@ class DriverProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ✅ FIXED: Use dynamic type
   Future<void> fetchAvailableOrders() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _apiService.getAvailableOrders();
+      final dynamic response = await _apiService.getAvailableOrders();
       print('📦 Fetch available orders raw response: $response');
-      
+
       _availableOrders = [];
-      
-      // getAvailableOrders always returns Map<String, dynamic>
-      if (response['success'] == true) {
-        final data = response['data'];
-        if (data is List) {
-          for (var item in data) {
-            try {
-              final order = Order.fromJson(item as Map<String, dynamic>);
-              _availableOrders.add(order);
-            } catch (e) {
-              print('❌ Error parsing available order: $e');
-            }
+
+      if (response is List) {
+        print('✅ Available orders: direct list with ${response.length} items');
+
+        for (var item in response) {
+          try {
+            print('📦 Processing available order: ${item['order_number']}');
+            final order = Order.fromJson(item as Map<String, dynamic>);
+            _availableOrders.add(order);
+          } catch (e) {
+            print('❌ Error parsing available order: $e');
           }
-          print('✅ Available orders loaded: ${_availableOrders.length}');
+        }
+      } else if (response is Map<String, dynamic>) {
+        if (response['success'] == true) {
+          final data = response['data'];
+          if (data is List) {
+            print('✅ Available orders: wrapped list with ${data.length} items');
+
+            for (var item in data) {
+              try {
+                print('📦 Processing available order: ${item['order_number']}');
+                final order = Order.fromJson(item as Map<String, dynamic>);
+                _availableOrders.add(order);
+              } catch (e) {
+                print('❌ Error parsing available order: $e');
+              }
+            }
+          } else {
+            print('⚠️ Data is not a list: ${data.runtimeType}');
+          }
         } else {
-          print('⚠️ Data is not a list: ${data.runtimeType}');
+          _error = response['error'] ?? 'Failed to fetch available orders';
+          print('❌ Error loading available orders: $_error');
         }
       } else {
-        _error = response['error'] ?? 'Failed to fetch available orders';
-        print('❌ Error loading available orders: $_error');
+        print('⚠️ Unexpected response type: ${response.runtimeType}');
       }
+
+      print('✅ Available orders parsed: ${_availableOrders.length}');
     } catch (e) {
       _error = 'Network error: $e';
       print('❌ Network error fetching available orders: $e');

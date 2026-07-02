@@ -23,7 +23,9 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
   }
 
   Future<void> _loadDeliveries() async {
-    await Provider.of<DriverProvider>(context, listen: false).fetchAssignedOrders();
+    final driverProvider = Provider.of<DriverProvider>(context, listen: false);
+    await driverProvider.fetchAssignedOrders();
+    await driverProvider.fetchAvailableOrders(); // ✅ ALSO FETCH AVAILABLE ORDERS
   }
 
   double? _calculateDistance(double? lat1, double? lon1, double? lat2, double? lon2) {
@@ -43,7 +45,8 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
   @override
   Widget build(BuildContext context) {
     final driverProvider = Provider.of<DriverProvider>(context);
-    final deliveries = driverProvider.assignedOrders;
+    final assignedOrders = driverProvider.assignedOrders;
+    final availableOrders = driverProvider.availableOrders;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -62,38 +65,212 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
       ),
       body: driverProvider.isLoading
           ? const Center(child: CircularProgressIndicator())
-          : deliveries.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.delivery_dining_outlined, size: 80, color: Colors.grey.shade400),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No deliveries assigned',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
+          : RefreshIndicator(
+              onRefresh: _loadDeliveries,
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  // ✅ Available Orders Section (Ready for pickup)
+                  if (availableOrders.isNotEmpty) ...[
+                    const Text(
+                      '📦 Available for Pickup',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0A1A2B),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'You\'ll see deliveries here when assigned',
-                        style: TextStyle(color: Colors.grey.shade500),
+                    ),
+                    const SizedBox(height: 12),
+                    ...availableOrders.map((order) => _buildAvailableOrderCard(order)),
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // ✅ Assigned Orders Section
+                  if (assignedOrders.isNotEmpty) ...[
+                    const Text(
+                      '🚚 My Deliveries',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0A1A2B),
                       ),
-                    ],
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadDeliveries,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: deliveries.length,
-                    itemBuilder: (context, index) {
-                      return _buildDeliveryCard(deliveries[index]);
-                    },
-                  ),
-                ),
+                    ),
+                    const SizedBox(height: 12),
+                    ...assignedOrders.map((order) => _buildDeliveryCard(order)),
+                  ],
+
+                  // Empty state
+                  if (availableOrders.isEmpty && assignedOrders.isEmpty)
+                    Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.delivery_dining_outlined, size: 80, color: Colors.grey.shade400),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No deliveries',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Check back later for available orders',
+                            style: TextStyle(color: Colors.grey.shade500),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
     );
   }
 
+  // ✅ Available Order Card - Shows orders ready for pickup
+  Widget _buildAvailableOrderCard(Order order) {
+    final storeName = order.sellerName ?? 'Store';
+    final storeAddress = order.sellerAddress ?? 'Pickup location';
+    final driverFee = order.deliveryFee ?? 0;
+    final orderNumber = order.orderNumber ?? 'Order #${order.id ?? ''}';
+    final total = order.total ?? 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green.shade200),
+        boxShadow: [
+          BoxShadow(color: Colors.green.withOpacity(0.05), blurRadius: 5),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        storeName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'READY',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  orderNumber,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.storefront_outlined, size: 16, color: Colors.grey.shade600),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        storeAddress,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Earnings: ${Formatters.currencyFormat(driverFee)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      'Total: ${Formatters.currencyFormat(total)}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Color(0xFF0A1A2B),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final driverProvider = Provider.of<DriverProvider>(context, listen: false);
+                      final messenger = ScaffoldMessenger.of(context);
+                      final success = await driverProvider.acceptDelivery(
+                        int.parse(order.id),
+                      );
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            success ? '✅ Order accepted! 🚚' : '❌ ${driverProvider.error ?? 'Failed to accept'}',
+                          ),
+                          backgroundColor: success ? Colors.green : Colors.red,
+                        ),
+                      );
+                      if (success) {
+                        await _loadDeliveries();
+                      }
+                    },
+                    icon: const Icon(Icons.check_circle, size: 18),
+                    label: const Text('Accept Order'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0A1A2B),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ Delivery Card - Shows assigned deliveries
   Widget _buildDeliveryCard(Order order) {
     final status = order.status?.toLowerCase() ?? 'pending';
 
@@ -137,7 +314,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(color: Colors.grey.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 2)),
         ],
@@ -145,7 +322,6 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Order number header
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -169,17 +345,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
               ],
             ),
           ),
-
           const Divider(height: 1),
-
-          // Progress steps
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: _buildProgressSteps(status),
-          ),
-
-          const Divider(height: 1),
-
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -214,20 +380,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                     ),
                   ],
                 ),
-
-                // Dotted line connector
-                Padding(
-                  padding: const EdgeInsets.only(left: 19),
-                  child: Column(
-                    children: List.generate(3, (_) => Container(
-                      margin: const EdgeInsets.symmetric(vertical: 2),
-                      width: 2,
-                      height: 4,
-                      color: Colors.grey.shade300,
-                    )),
-                  ),
-                ),
-
+                const SizedBox(height: 8),
                 // Delivery location
                 Row(
                   children: [
@@ -256,10 +409,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                     ),
                   ],
                 ),
-
-                const SizedBox(height: 16),
-
-                // Distance and Driver Fee
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
@@ -274,9 +424,7 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                             Icon(Icons.route_outlined, size: 16, color: Colors.grey.shade600),
                             const SizedBox(width: 6),
                             Text(
-                              distance != null
-                                  ? '${distance.toStringAsFixed(1)} km'
-                                  : 'N/A',
+                              distance != null ? '${distance.toStringAsFixed(1)} km' : 'N/A',
                               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey.shade700),
                             ),
                           ],
@@ -316,7 +464,6 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                     ),
                   ],
                 ),
-
                 if (itemCount > 0) ...[
                   const SizedBox(height: 12),
                   Container(
@@ -337,64 +484,51 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                     ),
                   ),
                 ],
-              ],
-            ),
-          ),
-
-          // Action Buttons
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Row(
-              children: [
-                if (isDriving)
-                  Expanded(
-                    child: ElevatedButton.icon(
+                if (!isDelivered) ...[
+                  const SizedBox(height: 12),
+                  if (isDriving)
+                    ElevatedButton.icon(
                       onPressed: () => _showDeliveryCompleteDialog(context, order),
                       icon: const Icon(Icons.check_circle, size: 18),
                       label: const Text('Complete Delivery'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
-                    ),
-                  )
-                else if (isPickedUp || isPending)
-                  Expanded(
-                    child: ElevatedButton.icon(
+                    )
+                  else if (isPickedUp || isPending)
+                    ElevatedButton.icon(
                       onPressed: () => _showPickupDialog(context, order),
                       icon: const Icon(Icons.shopping_bag, size: 18),
                       label: const Text('Pick Up Order'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0A1A2B),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                     ),
-                  )
-                else if (isDelivered)
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.green.shade200),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.check_circle, color: Colors.green, size: 20),
-                          SizedBox(width: 8),
-                          Text('Completed', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
+                ],
+                if (isDelivered)
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green.shade200),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.green, size: 20),
+                        SizedBox(width: 8),
+                        Text('Completed', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                      ],
                     ),
                   ),
-                const SizedBox(width: 8),
-                
+                const SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed: () {
                     final orderData = order.toJson();
@@ -408,8 +542,8 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
                   label: const Text('Details'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFF0A1A2B),
-                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     side: BorderSide(color: Colors.grey.shade300),
                   ),
                 ),
@@ -419,73 +553,6 @@ class _DriverDeliveriesScreenState extends State<DriverDeliveriesScreen> {
         ],
       ),
     );
-  }
-
-  Widget _buildProgressSteps(String status) {
-    final steps = ['pending', 'picked_up', 'delivered'];
-    final labels = ['Pending', 'Picked Up', 'Delivered'];
-
-    int currentStep = 0;
-    if (status == 'picked_up') currentStep = 1;
-    if (status == 'driving') currentStep = 1;
-    if (status == 'delivered') currentStep = 2;
-
-    return Row(
-      children: List.generate(steps.length * 2 - 1, (i) {
-        if (i.isOdd) {
-          final filled = (i ~/ 2) < currentStep;
-          return Expanded(
-            child: Container(
-              height: 2,
-              color: filled ? Colors.green : Colors.grey.shade300,
-            ),
-          );
-        }
-        final stepIndex = i ~/ 2;
-        final isCompleted = stepIndex < currentStep;
-        final isActive = stepIndex == currentStep;
-
-        return Column(
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: isCompleted
-                    ? Colors.green
-                    : isActive
-                        ? const Color(0xFF0A1A2B)
-                        : Colors.grey.shade200,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                isCompleted ? Icons.check : _stepIcon(stepIndex),
-                size: 14,
-                color: (isCompleted || isActive) ? Colors.white : Colors.grey,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              labels[stepIndex],
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                color: isActive ? const Color(0xFF0A1A2B) : Colors.grey,
-              ),
-            ),
-          ],
-        );
-      }),
-    );
-  }
-
-  IconData _stepIcon(int index) {
-    switch (index) {
-      case 0: return Icons.receipt_outlined;
-      case 1: return Icons.shopping_bag_outlined;
-      case 2: return Icons.check_circle_outline;
-      default: return Icons.circle_outlined;
-    }
   }
 
   void _showPickupDialog(BuildContext context, Order order) {
